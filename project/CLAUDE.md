@@ -1,4 +1,4 @@
-# ops_template — CLAUDE.md（索引）
+# project — CLAUDE.md（索引）
 
 Agent 運作制度包：把高階模型（Fable 5）的判斷外化成便宜模型（Haiku/Sonnet/Opus）能長期照做的規則。本目錄既是可攜模板（複製到其他專案用），也是一個以自身為根目錄的活專案。
 
