@@ -1,0 +1,16 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "upward-mobility",
+  "description": "Externalized senior-model judgment as durable operating rules that cheaper models can follow long-term.",
+  "owner": {
+    "name": "Lans Hung"
+  },
+  "plugins": [
+    {
+      "name": "upward",
+      "description": "Always-on operating discipline (commander-doesn't-descend, verify-not-self-verify, model escalation ladder, rollback-before-reapproach) plus on-demand ops skills for weak-model sessions.",
+      "source": "./upward",
+      "category": "productivity"
+    }
+  ]
+}
