@@ -1,0 +1,11 @@
+# macOS
+.DS_Store
+
+# Editor
+*.swp
+*~
+.idea/
+.vscode/
+
+# Manual backups (git replaces these — see CLAUDE.md backup convention)
+*.bak
