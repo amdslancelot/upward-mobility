@@ -1,85 +1,82 @@
 ---
 name: ops-judge
-description: 判斷力 rubric。卡住或不確定時查：何時該升級模型、何時算真的完成、何時該停下問使用者、什麼訊號代表方向錯了該換路而非重試（含卡住先回滾）、品質底線怎麼驗、模糊題與品味判斷的誠實條款。Use when stuck, unsure whether a task is done, considering escalation, or deciding whether to change approach.
+description: Judgment externalized as a rubric. Check here when stuck or unsure — when to escalate the model, when a task actually counts as done, when to stop and ask the user, what signals mean the direction is wrong and you should change course instead of retrying (including "roll back before re-approaching"), how to verify a quality floor, and the honesty clause for ambiguous calls and taste judgments. Use when stuck, unsure whether a task is done, considering escalation, or deciding whether to change approach.
 ---
-# 判斷力外化：rubric 與 checklist
+# Judgment, externalized: rubric and checklist
 
-> 讀者：較小模型。每條規則附一正例一反例（範例是通用的；換成你專案的實例更有效）。
-> 規則具體到可照做；照做勝過自由發揮。
+> Audience: the smaller model. Every rule ships with one good example and one bad example (the examples are generic — swapping in a real instance from your own project works better).
+> Rules are specific enough to just follow; following them beats improvising.
 
-## 1. 何時升級模型
+## 1. When to escalate the model
 
-**規則**：滿足任一 → 升級（路徑見 `ops-dispatch skill`）：
-- 同一子任務已失敗（haiku 一次 / sonnet 兩次），且失敗原因不是 prompt 少給了資訊。
-- 任務要求「在多個都說得通的方案之間選一個」且選錯的代價 > 重寫一天。
-- 任務涉及刪除、資料遷移、對外發布，且你說不出「錯了怎麼還原」。
+**Rule**: escalate (see `ops-dispatch skill` for the ladder) if any of these hold:
+- The same subtask has already failed (once for Haiku / twice for Sonnet), and the failure wasn't caused by the prompt missing information.
+- The task requires "picking one option among several defensible ones," and picking wrong costs more than a full day's rework.
+- The task involves deletion, data migration, or a public release, and you can't say how you'd roll it back if it goes wrong.
 
-**正例**：sonnet 兩次都修不到驗收標準（例：誤差要 <50ms，只到 200ms），兩次軌跡打包升 opus。✅
-**反例**：「這個任務感覺很難」就升級 — 難度感覺不是判準，失敗證據才是。❌
+**Good**: Sonnet fails to hit the acceptance criteria twice in a row (e.g., needs <50ms error, only gets to 200ms) — bundle both traces and escalate to Opus. ✅
+**Bad**: escalating just because "this task feels hard" — difficulty *feeling* hard isn't the rubric, failure evidence is. ❌
 
-**先自查再升級**：升級前先檢查交辦 prompt 是否缺三要素。一半的「模型太弱」其實是 prompt 太糊。
+**Check yourself before escalating**: before escalating, check whether the delegation prompt was missing one of the three required elements. Half of "the model's too weak" is actually "the prompt was too vague."
 
-## 2. 何時算真的完成
+## 2. When a task actually counts as done
 
-**規則**：三項全過才算完成：
-1. 驗收條件逐條核對過（不是「大致符合」）。
-2. 驗證來自執行結果（測試輸出、實跑、read-back），不是「我讀了程式碼覺得對」。
-3. 回報裡沒有「應該」「大概」「理論上」修飾完成宣稱。
+**Rule**: all three must pass:
+1. Every acceptance criterion checked off individually (not "roughly matches").
+2. Verification comes from execution results (test output, a real run, a read-back) — not "I read the code and it looks right."
+3. The report contains no hedges like "should," "probably," "in theory" around the completion claim.
 
-**正例**：「build 通過（0 error）、新增 3 個 case 測試綠、read-back 確認檔案完整」。✅
-**反例**：「我已完成修改，邏輯上這樣就能運作了」— 沒跑過就是沒完成，寫「已改完，未驗證，因為 X」。❌
+**Good**: "Build passes (0 errors), 3 new test cases added and green, read-back confirms the file is complete." ✅
+**Bad**: "I've made the change, logically it should work now" — if you haven't run it, it's not done. Write "changes made, unverified, because X" instead. ❌
 
-## 3. 何時停下來問使用者
+## 3. When to stop and ask the user
 
-**規則**：只有三種情況才停：
-- 動作不可逆且非任務明示（刪 branch、覆寫非自己建立的檔、發布到外部服務）。
-- 兩個方案都合理，但選擇取決於只有使用者知道的偏好/商業脈絡。
-- 發現任務前提錯誤（使用者說「修 X 的 bug」但 X 其實是刻意設計）。
+**Rule**: only stop for these three cases:
+- The action is irreversible and wasn't explicitly requested by the task (deleting a branch, overwriting a file you didn't create, publishing to an external service).
+- Two options are both defensible, but the right choice depends on a preference or business context only the user knows.
+- You discover the task's premise itself is wrong (the user says "fix the bug in X," but X is actually working as designed).
 
-其他一律：選常規預設 → 回報中一句話講明選了什麼 → 繼續做。
+Everything else: pick the sensible default → state in one line in your report what you picked → keep going.
 
-**正例**：要覆寫的檔案不是自己建的且內容與描述不符 → 停，回報。✅
-**反例**：「測試檔要放 __tests__ 還是同層？」— repo 已有慣例，自己看，照舊例。❌
+**Good**: the file you're about to overwrite wasn't created by you and its contents don't match its description → stop, report it. ✅
+**Bad**: "should test files go in `__tests__` or alongside the source?" — the repo already has a convention; check it yourself and follow precedent. ❌
 
-## 4. 什麼訊號代表方向錯了，該換路而非重試
+## 4. What signals mean the direction is wrong, and you should change course instead of retrying
 
-**規則**：出現任一訊號 → 停止重試，寫下目前假設、換路或升級：
-- 每修一個錯就冒出一個新錯，連續三次（在打地鼠 = 改錯層）。
-- 修法需要碰的檔案數比預估多一倍以上（範圍理解錯了，回頭重讀）。
-- 你開始對抗工具/框架（猴補 library、繞過型別、hack 生命週期）而不是使用它。
-- 同一個錯誤訊息第二次原樣出現（上次的修沒生效 — 先確認改的檔案真的在執行路徑上；仍頑固就照 `ops-diagnose skill`#5 查是不是環境／依賴／陳舊產物在作祟）。
+**Rule**: any of these signals → stop retrying, write down your current assumptions, then change course or escalate:
+- Every fix spawns a new error, three times in a row (that's whack-a-mole — you're fixing the wrong layer).
+- The fix touches more than double the number of files you estimated (you misjudged the scope — go back and re-read it).
+- You've started fighting the tool or framework (monkey-patching a library, working around the type system, hacking the lifecycle) instead of using it as designed.
+- The exact same error message shows up a second time (your last fix didn't take — first confirm the file you edited is actually on the execution path; if it's still stuck, check `ops-diagnose skill` #5 for environment/dependency/stale-artifact causes).
 
-**正例**：為了繞過某 API 的限制開始高頻輪詢 hack → 這是對抗工具，正解是換架構路徑。✅
-**反例**：測試失敗一次就放棄整個方案換路 — 一次失敗是資訊，不是訊號。❌
+**Good**: you start high-frequency polling as a hack to work around some API's limitation → that's fighting the tool, the real fix is a different architecture. ✅
+**Bad**: abandoning the whole approach and changing course after a single test failure — one failure is information, not a signal. ❌
 
-**卡住後先回滾，下一步看症狀分兩支**：命中上述訊號時，一律先還原到上一個綠燈檢查點
-（git commit；沒用 git 的專案先 `git init`）——別在壞掉的狀態上再疊 fix，那只會讓故障面越積越大。
-前提：**每個里程碑通過驗收時就存一個檢查點**，沒存就沒得回滾。回滾之後分兩種走法：
-- **像 regression（打地鼠連三次、同一錯誤原樣重現、以前會跑現在不會）**：有單一 culprit。
-  一次只重放一個改動，定位是哪一步打破的，找到再修。bisect 有效。
-- **像方法錯（在對抗工具/框架、要碰的檔比預估多一倍）**：沒有單一 culprit，整個 approach 才是病灶。
-  **不要 bisect**——一次重放一個改動只會重新確認方向錯、白跑輪次。直接 re-plan 或帶失敗軌跡升級。
+**Roll back before re-approaching, then split your next step by symptom.** The moment you hit one of the signals above, revert to the last known-good checkpoint first (a git commit; if the project doesn't use git, run `git init` first). Don't stack another fix on broken state — that only grows the blast radius. Precondition: **save a checkpoint every time a milestone clears its acceptance criteria.** No checkpoint, no rollback.
 
-手寫的「改了什麼」prose log 不算檢查點——它會漂移、會謊報「已還原」；回滾要靠 git 這種
-不會騙人的狀態，不靠敘述。
+After rolling back, there are two paths forward:
+- **Looks like a regression** (whack-a-mole three times running, the exact same error recurring, something that used to work and doesn't anymore): there's a single culprit. Replay one change at a time, find the step that broke it, then fix it. Bisecting works here.
+- **Looks like the wrong approach** (fighting the tool/framework, files touched more than double your estimate): there's no single culprit — the whole approach is the problem. **Don't bisect** — replaying one change at a time just reconfirms the direction is wrong and burns rounds. Re-plan directly, or escalate with the failure traces attached.
 
-**正例**：連續三次打地鼠 → 回到上次綠燈逐一 cherry-pick，第二個改動一套上就重現錯誤 → 病灶定位。✅
-**反例**：發現要碰的檔數暴增（方向錯）卻硬跑「一次重放一個改動」→ 沒有單一病灶可找，白跑幾輪才承認該 re-plan。❌
+A handwritten "what I changed" prose log doesn't count as a checkpoint. It drifts, and it'll happily lie that something's "already reverted." Rolling back needs git-grade state that can't lie to you, not a narrative.
 
-## 5. 品質底線怎麼驗
+**Good**: three rounds of whack-a-mole in a row → roll back to the last green checkpoint and cherry-pick changes one at a time; the second change reintroduces the error → culprit found. ✅
+**Bad**: you notice the file count has exploded (wrong direction) but force through "replay one change at a time" anyway → there's no single culprit to find, and you only admit you need to re-plan after burning several rounds for nothing. ❌
 
-**規則**（依產物類型）：
-- **程式碼**：build 過 + 該路徑實跑一次或有測試。動到核心功能的：實際操作一次。有分支/迴圈/解析的新邏輯留一個最小可跑的 check。
-- **文件**：派 fresh-context haiku read-back：「不看其他脈絡，這份文件你能照做嗎？哪一句有兩種讀法？」有兩讀的句子改到只剩一讀。
-- **架構判斷**：寫出「此判斷錯誤時最早的可觀察訊號」— 寫不出來表示判斷不可驗，降級成實驗（先做小 spike）。
-- **通用**：任何「我覺得沒問題」都要能指出對應的執行證據，指不出來 = 未驗。
+## 5. How to verify the quality floor
 
-## 6. 模糊題與品味判斷（誠實條款)
+**Rule** (by artifact type):
+- **Code**: build passes, plus the path in question has been run for real once, or has a test. Anything touching core functionality: actually exercise it once. New logic with branches/loops/parsing: leave behind one minimal runnable check.
+- **Docs**: dispatch a fresh-context Haiku read-back: "Without any other context, can you follow this document? Which sentence has two possible readings?" Rewrite any sentence with two readings until it only has one.
+- **Architectural judgment calls**: write down "the earliest observable signal if this judgment turns out wrong" — if you can't write that down, the judgment isn't verifiable, so downgrade it to an experiment (do a small spike first).
+- **General**: any "I think this is fine" needs to point to matching execution evidence. Can't point to it? It's unverified.
 
-拆解、驗證、多樣本評審補得了執行品質；**模糊需求的拆解方向、產品品味、感官品質（音訊、視覺、手感），弱模型補不了**。遇到時不硬做：
-1. 能實測就實測（用量測工具把品味題變成數字題 — 這類工具的投資優先級極高）。
-2. 不能實測就升 opus 出兩個帶理由的方案，讓使用者選。
-3. 都不行就明說「這題超出我可靠判斷的範圍」，附上你能確定的部分。
+## 6. Ambiguous calls and taste judgments (the honesty clause)
 
-**正例**：「這個動畫順不順」→ 不猜，請使用者看 A/B 兩版。✅
-**反例**：自己給參數編一個「體感最佳值」。❌
+Decomposition, verification, and multi-sample review can shore up execution quality — but **the direction you decompose an ambiguous requirement into, product taste, and sensory quality (audio, visual, feel) are things a weaker model cannot make up for.** When you hit one of these, don't force it:
+1. If you can measure it, measure it (turn a taste question into a numbers question with a measurement tool — building that kind of tool is a very high-priority investment).
+2. If you can't measure it, escalate to Opus for two options with reasoning, and let the user pick.
+3. If neither works, say plainly "this is outside what I can reliably judge," and attach the parts you *are* sure of.
+
+**Good**: "does this animation feel smooth?" → don't guess, ask the user to look at A/B versions. ✅
+**Bad**: making up a "feels-optimal" parameter value yourself. ❌

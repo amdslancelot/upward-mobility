@@ -1,81 +1,78 @@
-# 判斷力外化：rubric 與 checklist
+# Externalizing judgment: rubrics and checklists
 
-> 讀者：較小模型。每條規則附一正例一反例（範例是通用的；換成你專案的實例更有效）。
-> 規則具體到可照做；照做勝過自由發揮。
+> Reader: smaller models. Every rule ships with one good example and one bad example (the examples are generic — swap in a real instance from your own project and they work better).
+> Rules are concrete enough to follow literally. Following them beats improvising.
 
-## 1. 何時升級模型
+## 1. When to escalate the model
 
-**規則**：滿足任一 → 升級（路徑見 `ops/model-dispatch.md`）：
-- 同一子任務已失敗（haiku 一次 / sonnet 兩次），且失敗原因不是 prompt 少給了資訊。
-- 任務要求「在多個都說得通的方案之間選一個」且選錯的代價 > 重寫一天。
-- 任務涉及刪除、資料遷移、對外發布，且你說不出「錯了怎麼還原」。
+**Rule**: escalate (path in `ops/model-dispatch.md`) if any of these hold:
+- The same subtask has already failed (once on haiku / twice on sonnet), and the failure wasn't caused by a prompt missing information.
+- The task requires "picking one option among several that all sound reasonable," and picking wrong costs more than a day of rework.
+- The task involves deletion, data migration, or a public release, and you can't say how you'd undo it if it goes wrong.
 
-**正例**：sonnet 兩次都修不到驗收標準（例：誤差要 <50ms，只到 200ms），兩次軌跡打包升 opus。✅
-**反例**：「這個任務感覺很難」就升級 — 難度感覺不是判準，失敗證據才是。❌
+**Good example**: sonnet fails to hit the acceptance bar twice (say, error needs to be <50ms, only gets to 200ms) — package up both failure trails and escalate to opus. ✅
+**Bad example**: escalating because "this task feels hard" — difficulty as a feeling isn't the rubric, failure evidence is. ❌
 
-**先自查再升級**：升級前先檢查交辦 prompt 是否缺三要素。一半的「模型太弱」其實是 prompt 太糊。
+**Check yourself before escalating**: check whether the delegation prompt was missing one of the three required elements. Half of "the model's too weak" is actually "the prompt was too vague."
 
-## 2. 何時算真的完成
+## 2. When something actually counts as done
 
-**規則**：三項全過才算完成：
-1. 驗收條件逐條核對過（不是「大致符合」）。
-2. 驗證來自執行結果（測試輸出、實跑、read-back），不是「我讀了程式碼覺得對」。
-3. 回報裡沒有「應該」「大概」「理論上」修飾完成宣稱。
+**Rule**: all three must pass before it counts as done:
+1. Every acceptance criterion checked item by item (not "roughly matches").
+2. Verification comes from an execution result (test output, an actual run, a read-back) — not "I read the code and it looked right."
+3. The completion claim in the report carries no hedge words like "should," "probably," or "in theory."
 
-**正例**：「build 通過（0 error）、新增 3 個 case 測試綠、read-back 確認檔案完整」。✅
-**反例**：「我已完成修改，邏輯上這樣就能運作了」— 沒跑過就是沒完成，寫「已改完，未驗證，因為 X」。❌
+**Good example**: "Build passes (0 errors), 3 new test cases green, read-back confirms the file is complete." ✅
+**Bad example**: "I've finished the change, logically this should work now" — if you haven't run it, it's not done. Write "changes made, unverified, because X" instead. ❌
 
-## 3. 何時停下來問使用者
+## 3. When to stop and ask the user
 
-**規則**：只有三種情況才停：
-- 動作不可逆且非任務明示（刪 branch、覆寫非自己建立的檔、發布到外部服務）。
-- 兩個方案都合理，但選擇取決於只有使用者知道的偏好/商業脈絡。
-- 發現任務前提錯誤（使用者說「修 X 的 bug」但 X 其實是刻意設計）。
+**Rule**: stop only in these three situations:
+- The action is irreversible and wasn't explicitly authorized by the task (deleting a branch, overwriting a file you didn't create, publishing to an external service).
+- Two options are both reasonable, but the right choice depends on a preference or business context only the user knows.
+- You discover the task's premise is wrong (the user says "fix the bug in X," but X is actually working as designed).
 
-其他一律：選常規預設 → 回報中一句話講明選了什麼 → 繼續做。
+Everything else: pick the sensible default → state in one sentence in your report what you picked → keep going.
 
-**正例**：要覆寫的檔案不是自己建的且內容與描述不符 → 停，回報。✅
-**反例**：「測試檔要放 __tests__ 還是同層？」— repo 已有慣例，自己看，照舊例。❌
+**Good example**: the file you're about to overwrite wasn't one you created, and its contents don't match its description → stop, report. ✅
+**Bad example**: "Should the test file go in `__tests__` or next to the source?" — the repo already has a convention; look at it and follow it. ❌
 
-## 4. 什麼訊號代表方向錯了，該換路而非重試
+## 4. What signals mean the direction is wrong and you should change course, not keep retrying
 
-**規則**：出現任一訊號 → 停止重試，寫下目前假設、換路或升級：
-- 每修一個錯就冒出一個新錯，連續三次（在打地鼠 = 改錯層）。
-- 修法需要碰的檔案數比預估多一倍以上（範圍理解錯了，回頭重讀）。
-- 你開始對抗工具/框架（猴補 library、繞過型別、hack 生命週期）而不是使用它。
-- 同一個錯誤訊息第二次原樣出現（上次的修沒生效 — 先確認改的檔案真的在執行路徑上；仍頑固就照 `ops/harness-diagnosis.md`#5 查是不是環境／依賴／陳舊產物在作祟）。
+**Rule**: any of these signals appears → stop retrying, write down your current assumptions, and either change course or escalate:
+- Every fix produces a new error, three times in a row (whack-a-mole = you're fixing the wrong layer).
+- The fix requires touching more than double the number of files you estimated (your understanding of scope was wrong — go reread it).
+- You've started fighting the tool/framework (monkey-patching a library, working around the type system, hacking around a lifecycle) instead of using it.
+- The exact same error message shows up a second time (your last fix didn't take — first confirm the file you edited is actually on the execution path; if it's still stubborn, check whether environment/dependencies/stale artifacts are the culprit, per `ops/harness-diagnosis.md`#5).
 
-**正例**：為了繞過某 API 的限制開始高頻輪詢 hack → 這是對抗工具，正解是換架構路徑。✅
-**反例**：測試失敗一次就放棄整個方案換路 — 一次失敗是資訊，不是訊號。❌
+**Good example**: you start high-frequency polling to work around some API's rate limit → that's fighting the tool; the right fix is a different architecture. ✅
+**Bad example**: giving up on the whole approach after a single test failure — one failure is information, not a signal. ❌
 
-**卡住後先回滾，下一步看症狀分兩支**：命中上述訊號時，一律先還原到上一個綠燈檢查點
-（git commit；沒用 git 的專案先 `git init`）——別在壞掉的狀態上再疊 fix，那只會讓故障面越積越大。
-前提：**每個里程碑通過驗收時就存一個檢查點**，沒存就沒得回滾。回滾之後分兩種走法：
-- **像 regression（打地鼠連三次、同一錯誤原樣重現、以前會跑現在不會）**：有單一 culprit。
-  一次只重放一個改動，定位是哪一步打破的，找到再修。bisect 有效。
-- **像方法錯（在對抗工具/框架、要碰的檔比預估多一倍）**：沒有單一 culprit，整個 approach 才是病灶。
-  **不要 bisect**——一次重放一個改動只會重新確認方向錯、白跑輪次。直接 re-plan 或帶失敗軌跡升級。
+**When stuck, roll back first, then branch on the symptom.** When you hit one of the signals above, always restore to the last green checkpoint first (git commit; if the project isn't using git, `git init` first). Don't stack another fix on a broken state — that only lets the blast radius grow. Precondition: **you save a checkpoint every time a milestone clears acceptance.** No checkpoint, no rollback.
 
-手寫的「改了什麼」prose log 不算檢查點——它會漂移、會謊報「已還原」；回滾要靠 git 這種
-不會騙人的狀態，不靠敘述。
+After rolling back, there are two paths forward:
+- **Looks like a regression** (whack-a-mole three times in a row, the same error reappearing verbatim, something that used to work and now doesn't): there's a single culprit. Replay one change at a time, find the exact step that broke it, then fix it. Bisecting works here.
+- **Looks like the wrong approach** (fighting the tool/framework, files to touch running at double your estimate): there's no single culprit — the whole approach is the disease. **Don't bisect** — replaying one change at a time will just reconfirm the direction is wrong and burn rounds for nothing. Re-plan directly, or escalate with the failure trail attached.
 
-**正例**：連續三次打地鼠 → 回到上次綠燈逐一 cherry-pick，第二個改動一套上就重現錯誤 → 病灶定位。✅
-**反例**：發現要碰的檔數暴增（方向錯）卻硬跑「一次重放一個改動」→ 沒有單一病灶可找，白跑幾輪才承認該 re-plan。❌
+A hand-written "here's what I changed" prose log doesn't count as a checkpoint. It drifts, and it'll lie to you about having "already rolled back." Rolling back needs git-grade state that can't lie, not a narrative.
 
-## 5. 品質底線怎麼驗
+**Good example**: three rounds of whack-a-mole in a row → go back to the last green state and cherry-pick changes one at a time; the second change reproduces the error the moment it's applied → culprit located. ✅
+**Bad example**: noticing the number of files to touch has exploded (wrong direction) but forcing through "replay one change at a time" anyway → there's no single culprit to find, and it takes several wasted rounds before anyone admits a re-plan is needed. ❌
 
-**規則**（依產物類型）：
-- **程式碼**：build 過 + 該路徑實跑一次或有測試。動到核心功能的：實際操作一次。有分支/迴圈/解析的新邏輯留一個最小可跑的 check。
-- **文件**：派 fresh-context haiku read-back：「不看其他脈絡，這份文件你能照做嗎？哪一句有兩種讀法？」有兩讀的句子改到只剩一讀。
-- **架構判斷**：寫出「此判斷錯誤時最早的可觀察訊號」— 寫不出來表示判斷不可驗，降級成實驗（先做小 spike）。
-- **通用**：任何「我覺得沒問題」都要能指出對應的執行證據，指不出來 = 未驗。
+## 5. How to verify the quality bar
 
-## 6. 模糊題與品味判斷（誠實條款)
+**Rule** (by output type):
+- **Code**: build passes + the path gets actually run once, or has a test. Anything touching core functionality: run it for real, once. New logic with branches/loops/parsing: leave behind one minimal runnable check.
+- **Documents**: dispatch a fresh-context haiku read-back: "Without seeing any other context, can you follow this document as written? Which sentence has more than one reading?" Rewrite any sentence with two readings until it only has one.
+- **Architectural judgment calls**: write down "the earliest observable signal that this judgment call was wrong" — if you can't write one, the judgment call isn't verifiable; downgrade it to an experiment (do a small spike first).
+- **General**: any "I think this is fine" needs to point to matching execution evidence. Can't point to it = not verified.
 
-拆解、驗證、多樣本評審補得了執行品質；**模糊需求的拆解方向、產品品味、感官品質（音訊、視覺、手感），弱模型補不了**。遇到時不硬做：
-1. 能實測就實測（用量測工具把品味題變成數字題 — 這類工具的投資優先級極高）。
-2. 不能實測就升 opus 出兩個帶理由的方案，讓使用者選。
-3. 都不行就明說「這題超出我可靠判斷的範圍」，附上你能確定的部分。
+## 6. Ambiguous questions and taste calls (the honesty clause)
 
-**正例**：「這個動畫順不順」→ 不猜，請使用者看 A/B 兩版。✅
-**反例**：自己給參數編一個「體感最佳值」。❌
+Decomposition, verification, and multi-sample review can shore up execution quality. But **the direction of decomposing an ambiguous requirement, product taste, and sensory quality (audio, visuals, feel) are things a weak model cannot make up for.** When you hit one of these, don't force it:
+1. If you can measure it, measure it (turn a taste question into a numbers question using a measurement tool — investing in these tools is a very high priority).
+2. If you can't measure it, escalate to opus for two reasoned options and let the user choose.
+3. If neither works, say plainly "this is beyond what I can reliably judge," and attach the parts you are confident about.
+
+**Good example**: "Does this animation feel smooth?" → don't guess, have the user look at an A/B comparison of two versions. ✅
+**Bad example**: making up a "best-feeling" parameter value on your own. ❌

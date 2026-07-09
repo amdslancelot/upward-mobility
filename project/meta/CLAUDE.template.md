@@ -1,48 +1,52 @@
-# {{專案名}} — CLAUDE.md（索引）
+# {{project name}} — CLAUDE.md (index)
 
-{{一到三行：這個專案是什麼、給誰用、核心技術棧。例：「電商後台：產品管理 + 訂單查詢，內部營運人員用。React + PostgreSQL。」}}
+{{One to three lines: what this project is, who it's for, the core tech stack. Example: "E-commerce
+back office: product management + order lookup, used by internal ops staff. React + PostgreSQL."}}
 
-**本檔只是索引。只讀你任務需要的那條指到的檔，不要為了「了解專案」整包掃 src/。**
+**This file is just an index. Read only the file your task points to — don't scan the whole `src/` tree just to "understand the project."**
 
-## Session 開始（照順序）
+## Start of session (in order)
 
-1. 讀本索引，找到任務相關的檔。
-2. 索引沒涵蓋 → 派便宜的搜尋型 subagent 去找（不要自己 grep 十次）。
-3. 派工、升降級、驗證規則 → `{{制度目錄}}/ops/model-dispatch.md`。
-4. 交辦 prompt 直接抄範本 → `{{制度目錄}}/ops/prompt-templates.md`。
+1. Read this index, find the file relevant to your task.
+2. Index doesn't cover it → delegate to a cheap search-type subagent (don't grep it yourself ten times).
+3. Delegation, escalation, verification rules → `{{system directory}}/ops/model-dispatch.md`.
+4. Need a delegation prompt to copy → `{{system directory}}/ops/prompt-templates.md`.
 
-## 核心三規則（其餘見 ops 檔）
+## Three core rules (details in the ops files)
 
-- **指揮官不下場**：大量讀取/掃描/批次改檔/驗證一律派 subagent，主對話只收結論。
-- **驗證不自驗**：完成宣稱必須有執行證據（build/測試/實跑/read-back），驗證派新開的 general-purpose agent（不續用做事者）。
-- **卡住的判準查表**：何時升級模型、何時算完成、何時問使用者、何時換路 → `{{制度目錄}}/ops/judgment-rubrics.md`。
+- **The commander doesn't descend.** Bulk reading, scanning, batch edits, and verification always get delegated to a subagent. The main thread only receives conclusions.
+- **Verification isn't self-verification.** A completion claim needs execution evidence: build, test, actual run, or read-back. Verification goes to a freshly-spawned general-purpose agent, never the one that did the work.
+- **The stuck-point rubric.** When to escalate the model, when something actually counts as done, when to ask the user, when to change approach → `{{system directory}}/ops/judgment-rubrics.md`.
 
-## 程式碼地圖（{{查證日期}} 查證）
+## Codebase map (verified {{verification date}})
 
-{{派一個便宜 subagent 掃 repo 生成此表。格式：| 區域 | 位置 | 一句話說明 |。
-只列「任務會需要找的東西」：路由、核心邏輯、型別、schema、設定。10 行內。
-重要的「沒有什麼」也寫（例：無測試框架、無 API routes）— 省得弱模型去找不存在的東西。}}
+{{Delegate to a cheap subagent to scan the repo and generate this table. Format: | Area | Location | One-line description |.
+List only "the stuff a task will need to find": routes, core logic, types, schema, config.
+Keep it under 10 lines.
 
-| 區域 | 位置 | 說明 |
+Important "what's absent" also belongs here (e.g. no test framework, no API routes) — it saves the weak
+model from hunting for things that don't exist.}}
+
+| Area | Location | Description |
 |---|---|---|
 | {{...}} | {{...}} | {{...}} |
 
-## 設計文件（按需讀）
+## Design docs (read as needed)
 
-{{有才列。格式：- `路徑` — 一句話 + 什麼情況必讀。}}
+{{Only list these if they exist. Format: - `path` — one line + when it's a must-read.}}
 
-## 制度檔（按需讀）
+## Operating-discipline files (read as needed)
 
-- `{{制度目錄}}/ops/harness-diagnosis.md` — 此環境的陷阱與修法。
-- `{{制度目錄}}/ops/model-dispatch.md` — 派工對照表、三要素、升降級、驗證不自驗。
-- `{{制度目錄}}/ops/judgment-rubrics.md` — 判斷 checklist（每條含正反例）。
-- `{{制度目錄}}/ops/prompt-templates.md` — 六種交辦範本（搜尋/實作/重構/研究/審查/追加）。
-- `{{制度目錄}}/meta/maintenance.md` — 誰能改什麼、教訓寫回 `{{制度目錄}}/meta/lessons.md`（不存在就按需建立）、精簡時機。
-- `{{制度目錄}}/meta/letter-to-future-sessions.md` — 交接信（不存在就按 `{{制度目錄}}/meta/letter-template.md` 骨架建立）。
+- `{{system directory}}/ops/harness-diagnosis.md` — this environment's traps and how to fix them.
+- `{{system directory}}/ops/model-dispatch.md` — delegation reference table, the three required elements, escalation ladder, verification isn't self-verification.
+- `{{system directory}}/ops/judgment-rubrics.md` — judgment checklists (each with a good and a bad example).
+- `{{system directory}}/ops/prompt-templates.md` — six delegation templates (search / implement / refactor / research / review / follow-up).
+- `{{system directory}}/meta/maintenance.md` — who can change what, lessons get written back to `{{system directory}}/meta/lessons.md` (create it as needed if it doesn't exist), when to trim.
+- `{{system directory}}/meta/letter-to-future-sessions.md` — the handoff letter (if it doesn't exist, create it from the skeleton in `{{system directory}}/meta/letter-template.md`).
 
-## 硬規則
+## Hard rules
 
-- 寫進檔案的內容（code/docs/commit）一律完整句子正常寫；壓縮口吻只用於對話。
-- 改制度檔前先 git commit；新內容寫新檔；本索引 ≤150 行。
-- 型號/參數/價格永遠先查證再寫，查不到標 UNVERIFIED，不編造。
-{{專案特有硬規則，沒有就刪這行}}
+- Anything written into a file (code/docs/commit) is always full, normal sentences; compressed phrasing is for conversation only.
+- Commit with git before editing any operating-discipline file; new content goes in new files; this index stays ≤150 lines.
+- Model names/parameters/prices always get verified before being written down; if you can't verify, mark UNVERIFIED — never make it up.
+{{Project-specific hard rules — delete this line if there are none.}}

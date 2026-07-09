@@ -1,112 +1,112 @@
-# 計畫→執行→審查→修訂：讓弱模型跑完整品質迴圈的 prompt 模式
+# Plan → Execute → Review → Revise: a prompt pattern that gets a weak model through the whole quality loop
 
-> 讀者：使用者本人（下 prompt 時抄骨架）；次要讀者：主對話模型（收到這類 prompt 時照階段執行）。
-> 撰寫：2026-07-07，Fable 5 session。
-> 模型自套版（模型自己照階段走、不靠人下 prompt）見 `ops/plan-lifecycle.md`；兩份是同一迴圈，改一份順手檢查另一份。
+> Reader: you, the user (copy the skeleton when writing a prompt); secondary reader: the main-thread model (follow the phases when you receive this kind of prompt).
+> Written: 2026-07-07, Fable 5 session.
+> The model-self-driven version (the model runs the phases itself, no human prompting needed) is `ops/plan-lifecycle.md`. These are the same loop — edit one, check the other.
 >
-> 解決的問題：Sonnet 等級的指揮官預設「執行完就宣稱完成」——它不會自發列任務清單、
-> 不會主動派審查、收到審查 findings 後只會轉述給你而不會回頭修改自己的產出。
-> 這個迴圈（高階模型的工作本能）必須在 prompt 裡寫成明文義務，Sonnet 就能照跑。
+> The problem this solves: a Sonnet-tier commander defaults to "declare done the moment execution finishes." It won't spontaneously list out tasks, won't proactively delegate a review, and when it gets review findings back, it'll just relay them to you instead of going back and fixing its own output.
+> This loop (a top-tier model's working instinct) has to be spelled out as an explicit obligation in the prompt. Only then can Sonnet actually run it.
 
-## 骨架（直接抄，填 [ ] 空格）
+## The skeleton (copy this directly, fill in the `[ ]` blanks)
 
 ```
-任務：[目標與動機]。
+Task: [goal and motivation].
 
-階段一（計畫）：先列任務清單，每項附可判定的驗收條件，存成 plan.md 給我看。
-我確認前不要動工。
+Phase 1 (Plan): First list out the tasks, each with a decidable acceptance criterion, saved to plan.md for me to review.
+Don't start work before I confirm.
 
-階段二（執行）：逐項做，每完成一項立即存檔並在 plan.md 勾掉，再做下一項。
-每項通過驗收時記一個檢查點（git commit）到 plan.md。
-派工照 ops/model-dispatch.md，交辦抄 ops/prompt-templates.md。
-某項修兩次仍失敗，先回滾到上一個檢查點、別在壞狀態上疊第三個 fix；
-接著照症狀決定 bisect（regression）或 re-plan／升級（方法錯）——判準見 ops/judgment-rubrics.md#4。
+Phase 2 (Execute): Work through each item, saving immediately after finishing and checking it off in plan.md before moving to the next.
+Record a checkpoint (git commit) in plan.md whenever an item passes its acceptance criteria.
+Delegate per ops/model-dispatch.md, copy briefs from ops/prompt-templates.md.
+If an item fails twice after fixing, roll back to the last checkpoint first — don't stack a third fix on a broken state;
+then decide, based on the symptom, whether to bisect (regression) or re-plan/escalate (wrong approach) — criteria in ops/judgment-rubrics.md#4.
 
-階段三（審查）：全部項目完成後，派一個新開的 fresh-context agent 審查全部產出
-（agent 與 model 選法、prompt 加料見 ops/review-dispatch.md）。
-審查面向逐條給它：[例：規則互相矛盾 / 路徑或名稱錯誤 / 弱模型會誤讀的模糊句 / 未驗證的宣稱]。
-要求它：每個 finding 附 檔案:行號＋嚴重度；無發現的面向明說「查了、無發現」；不要改任何檔案。
+Phase 3 (Review): Once every item is done, delegate to a freshly-spawned fresh-context agent to review all the output
+(agent and model choice, prompt add-ons — see ops/review-dispatch.md).
+Give it the review angles explicitly: [e.g., contradicting rules / wrong paths or names / ambiguous wording a weak model would misread / unverified claims].
+Require it to: attach file:line + severity to every finding; explicitly state "checked, nothing found" for angles with no findings; not edit any files.
 
-階段四（修訂）：收到 findings 後逐條處置——採納就回頭修改對應產出，駁回要寫一句理由。
-修完後更新 plan.md 記錄「哪條 finding 改了哪個檔」。
-處置到 0 條未處理才算完成；審查修訂最多兩輪，第二輪後還有 finding 就列出來問我。
+Phase 4 (Revise): Once findings come back, handle each one — if accepted, go back and fix the corresponding output; if rejected, write one line of reasoning why.
+After fixing, update plan.md recording "which finding fixed which file."
+Only done once 0 findings remain unhandled; at most two rounds of review-and-revise — if findings remain after round two, list them and ask me.
 
-完成的定義：階段四結束，不是階段二結束。
+Definition of done: end of phase 4, not end of phase 2.
 ```
 
-## 每個設計對付弱模型的哪個毛病
+## What each design counters in a weak model
 
-| 設計 | 防什麼 |
+| Design | What it defends against |
 |---|---|
-| 計畫凍結成檔案（plan.md） | 中段漂移後，檔案是模型找回任務清單的錨；/compact 也不會丟 |
-| 「我確認前不要動工」 | 第一刀切錯方向——弱指揮官最大缺口（`meta/AUDIT-2026-07-07.md` 失效模式 3） |
-| 每項完成立即存檔 | session 隨時可能中斷，存了的才算數；也給階段三的審查員留可讀的產出 |
-| 每里程碑記檢查點＋失敗後先回滾 | 弱模型預設往壞掉的狀態疊 fix，故障面越積越大；檢查點讓它能回到 known-good，再照症狀 bisect 或 re-plan，而非憑記憶手動反改（判準見 `ops/judgment-rubrics.md`#4）|
-| 審查面向逐條列 | 不列面向，審查員只做它擅長的那種檢查，回「看起來沒問題」的假陰性 |
-| 審查員 fresh-context＋禁改檔 | 驗證不自驗；審查員只回報，採納與否是指揮官的判斷 |
-| **「回頭修改對應產出」寫成明文義務** | 整個模式的核心——弱模型預設把 findings 轉述給使用者就停，不會自己回去改前一輪的結果 |
-| 「駁回要寫一句理由」 | 防兩個極端：全盤照收（審查員有假陽性）與全盤忽略 |
-| 「更新 plan.md 記錄修了什麼」 | 留下修訂證據，之後的 session 或第二輪審查可核對 |
-| 「最多兩輪」 | 防審查↔修訂無限迴圈燒額度；判準同 ops/model-dispatch.md「同一件事最多重試兩輪」 |
-| 完成定義放最後一行 | 弱模型對「怎樣算完成」認最後看到的明確定義；不寫，它在階段二結束就收工 |
+| Plan frozen into a file (plan.md) | After mid-session drift, the file is the anchor the model uses to recover the task list; /compact won't lose it either |
+| "Don't start work before I confirm" | Getting the first cut wrong — the biggest gap for a weak commander (`meta/AUDIT-2026-07-07.md`, failure mode 3) |
+| Save immediately after each item | A session can be interrupted anytime; only what's saved counts — this also leaves readable output for phase 3's reviewer |
+| Record a checkpoint at each milestone + roll back before re-approaching a failure | A weak model defaults to stacking fixes on a broken state, growing the blast radius; checkpoints let it return to known-good, then bisect or re-plan based on the symptom instead of manually un-doing things from memory (criteria in `ops/judgment-rubrics.md`#4) |
+| Review angles listed explicitly | Without listed angles, the reviewer only runs the checks it's naturally good at, and reports a false-negative "looks fine" |
+| Reviewer is fresh-context + forbidden from editing | Verification isn't self-verification; the reviewer only reports — whether to accept a finding is the commander's judgment call |
+| **"Go back and fix the corresponding output" spelled out as an explicit obligation** | The core of this whole pattern — a weak model defaults to just relaying findings to you and stopping, rather than going back to fix the previous round's results itself |
+| "Rejecting requires one line of reasoning" | Guards against two extremes: rubber-stamping everything (the reviewer has false positives) and ignoring everything |
+| "Update plan.md recording what got fixed" | Leaves evidence of the revision, so a later session or a second review round can check it |
+| "At most two rounds" | Prevents an infinite review↔revise loop burning through budget; same threshold as ops/model-dispatch.md's "retry the same thing at most twice" |
+| Definition of done placed on the last line | A weak model weighs the most recently seen explicit definition of "done" most heavily; leave it out, and it calls it quits at the end of phase 2 |
 
-## 什麼時候用、什麼時候不用
+## When to use this, when not to
 
-- **用**：多項產出的任務（半天以上工作量）、產出要長期沿用（制度檔、對外文件、核心程式碼）、
-  錯誤成本高於一輪審查成本（審查一輪約 35–40k subagent tokens，見 `ops/review-dispatch.md` 成本節）。
-- **不用**：單檔小改、一次性草稿、答案已在對話裡的問題——整個迴圈的固定成本吃掉所有收益，
-  直接做＋輕量驗證即可。
+- **Use it.** Tasks with multiple outputs (half a day of work or more), output meant to be relied on long-term (operating-discipline files, external-facing docs, core code), where the cost of an error outweighs the cost of one review round (one review round runs roughly 35-40k subagent tokens — see the cost section of `ops/review-dispatch.md`).
+- **Don't use it.** A small single-file edit, a one-off draft, a question whose answer is already sitting in the conversation. The loop's fixed overhead eats any gain you'd get from it. Just do the work directly, with light verification.
 
-## 教學：照做一次（完整範例）
+## Worked example: doing this once, start to finish
 
-假設任務是「幫專案寫三份 onboarding 文件：安裝指南、架構導覽、常見錯誤排查」。
+Say the task is "write three onboarding docs for the project: a setup guide, an architecture tour, and a common-errors troubleshooting guide."
 
-**第 1 步——你貼出填好的骨架**：
+**Step 1 — you paste the filled-in skeleton**:
 
 ```
-任務：寫三份 onboarding 文件（安裝指南、架構導覽、常見錯誤排查），給新進工程師
-第一天用，目標是不問人就能跑起來開發環境。
+Task: write three onboarding docs (setup guide, architecture tour, common-errors troubleshooting),
+for a new engineer's first day, so they can get a dev environment running without asking anyone.
 
-階段一（計畫）：先列任務清單存成 plan.md 給我看，每份文件附驗收條件
-（例：安裝指南——照著做能從 git clone 走到測試全綠，每步有指令可貼）。
-我確認前不要動工。
-階段二（執行）：逐份寫，每完成一份存檔並在 plan.md 勾掉。
-階段三（審查）：三份都完成後，派 fresh-context agent 審查，面向：
-指令可執行性（模擬照做）/ 三份之間的矛盾 / 對新人的未定義術語。
-階段四（修訂）：逐條處置 findings，回頭改對應文件，plan.md 記錄修了什麼。
-0 條未處理才算完成；最多兩輪，之後問我。
-完成的定義：階段四結束。
+Phase 1 (Plan): First list out the tasks, saved to plan.md for me to review, each doc with an acceptance criterion
+(e.g., setup guide — following it should take someone from git clone to all tests passing, with a runnable command at every step).
+Don't start work before I confirm.
+Phase 2 (Execute): Write each doc in turn, saving and checking it off in plan.md as you finish each one.
+Phase 3 (Review): Once all three are done, delegate to a fresh-context agent to review, angles:
+whether the commands actually work (simulate following them) / contradictions between the three docs / undefined jargon for a newcomer.
+Phase 4 (Revise): Handle each finding, go back and fix the corresponding doc, record what got fixed in plan.md.
+Done only once 0 findings remain unhandled; at most two rounds, then ask me.
+Definition of done: end of phase 4.
 ```
 
-**第 2 步——模型回 plan.md，你只審三件事**：方向對嗎（它理解的「onboarding」是你要的嗎）、
-驗收條件可判定嗎（「寫清楚」不行，「照做能跑到測試綠」可以）、有沒有錯誤假設。
-回「可以，開始」或指出修正。
+**Step 2 — the model replies with plan.md.** Check exactly three things:
 
-**第 3 步——執行期你不用管**。模型每完成一份會存檔勾掉；你若看到它跳步
-（沒存檔就寫下一份），丟觸發句：「照 plan.md 逐項來，完成一項存一項。」
+1. Is the direction right? (Does its idea of "onboarding" match what you wanted?)
+2. Are the acceptance criteria decidable? ("Write it clearly" doesn't count, "following it gets you to all-green tests" does.)
+3. Are there any wrong assumptions?
 
-**第 4 步——審查回報長這樣，你看處置欄就好**：
+Reply "go ahead" or point out corrections.
 
-```
-findings：3 件（高 1 中 2）
-- [高] 安裝指南:12 — 「設定環境變數」沒給變數清單 → 已補表格（採納）
-- [中] 架構導覽:40 — 術語 "aggregator" 首次出現未定義 → 已加一句定義（採納）
-- [中] 排查:8 — 建議加 Windows 段落 → 駁回：團隊全用 mac（plan.md 已記錄理由）
-plan.md 已更新修訂記錄。
-```
+**Step 3 — during execution you don't need to watch it closely.** The model saves and checks off each doc as it finishes. If you notice it skipping a step (writing the next doc without saving the current one), drop the trigger phrase: "Follow plan.md item by item — save each one before moving on."
 
-**第 5 步——確認完成宣稱**：看 plan.md 是否每項勾掉＋修訂記錄齊全。有疑慮就抽查一條
-finding 對應的檔案位置。到此才算收貨。
-
-常見翻車點：你在第 2 步只回「好」沒看驗收條件（等於放棄整個模式最大的槓桿）；
-模型在階段四只轉述 findings 不修（回它：「階段四是修訂不是轉述，照 WEAK-MODEL-PROMPT-GUIDE.md 處置」）。
-
-## 縮減版（中型任務，省階段一的往返）
+**Step 4 — the review report looks like this, and you only need to look at the disposition column:**
 
 ```
-任務：[目標與動機]。驗收：[逐條]。
-做完後派 fresh-context agent 審查 [面向清單]，逐條處置 findings 並回頭修改產出，
-修完才回報。回報含：改了什麼、審查發現什麼、怎麼處置。
+findings: 3 (1 high, 2 medium)
+- [high] setup-guide:12 — "set environment variables" gives no list of variables → table added (accepted)
+- [medium] architecture-tour:40 — the term "aggregator" is used before being defined → definition sentence added (accepted)
+- [medium] troubleshooting:8 — suggested adding a Windows section → rejected: team is all-Mac (reasoning recorded in plan.md)
+plan.md updated with the revision log.
 ```
 
-省掉計畫確認（適合方向明確的任務），但保留「審查→回頭修」義務句——那是不可省的核心。
+**Step 5 — confirming the completion claim.** Check that plan.md has every item checked off and the revision log is complete. If you have doubts, spot-check one finding against the actual file location it references. Only then does it count as delivered.
+
+Common failure points:
+- At step 2, you reply "looks good" without actually reading the acceptance criteria. That throws away this whole pattern's biggest lever.
+- At phase 4, the model just relays findings without fixing anything. Tell it: "Phase 4 is revision, not relaying — handle it per WEAK-MODEL-PROMPT-GUIDE.md."
+
+## Shortened version (medium-sized tasks, skips the phase-1 back-and-forth)
+
+```
+Task: [goal and motivation]. Acceptance criteria: [itemized].
+Once done, delegate to a fresh-context agent to review [list of angles], handle each finding by going back and fixing the output,
+and only report back once fixes are done. Report should include: what changed, what the review found, how it was handled.
+```
+
+This skips confirming the plan up front (fine for a task with a clear direction), but keeps the "review → go back and fix" obligation — that part can't be cut.

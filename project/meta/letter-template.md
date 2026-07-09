@@ -1,19 +1,22 @@
-# 給未來 session 的信 — 骨架
+# A Letter to Future Sessions — Skeleton
 
-> 用法：每次重大 session（立制度、大架構決策、長時間深入某問題）結束時，照本骨架寫一封
-> `meta/letter-to-future-sessions.md`（本目錄；已存在就追加新的一節，註明日期與模型）。
-> 這封信的價值在於寫下「檔案與 code 讀不出來的東西」：判斷的信心程度、沒走的路、預期的退化方式。
+> How to use this: at the end of any major session (standing up a system, a big architectural decision, a
+> long deep-dive on some problem), write a `meta/letter-to-future-sessions.md` (in this directory; if one
+> already exists, append a new section, labeled with date and model) following this skeleton. The value of
+> this letter is writing down "the stuff files and code can't tell you": your confidence level on judgment
+> calls, roads not taken, expected ways things will degrade.
 
 ---
 
-# 給未來 session 的信
+# A Letter to Future Sessions
 
-> 寫於 {{日期}}，{{模型}} session。之後接手的是你 — 大概是 {{預期的接手模型}}。
+> Written {{date}}, in a {{model}} session. Whoever picks this up next is probably {{expected next model}}.
 
-## 三件使用者沒問但我認為最重要的事
+## Three things the user didn't ask, but I think matter most
 
-{{每件：一段。判準：什麼事「如果現在不說，未來 session 要花很多額度才能重新發現」？
-常見類型：真正的瓶頸在哪（vs 表面任務）、動工前該做的便宜實驗、使用者的隱含工作哲學。}}
+{{One paragraph each. The test: what's something that, "if I don't say it now, a future session will burn a
+lot of quota rediscovering it"? Common categories: where the real bottleneck actually is (vs. the surface
+task), a cheap experiment worth running before starting work, the user's unstated working philosophy.}}
 
 **1. {{...}}**
 
@@ -21,20 +24,29 @@
 
 **3. {{...}}**
 
-## 這套制度/決策最可能的退化方式與預防
+## The most likely ways this system/decision degrades, and how to prevent them
 
-{{列 3–4 個。每個：退化情境一句 + 預防法一句（預防法要指向具體檔案/規則，不能是「小心一點」）。
-常見退化：索引路徑腐化→信任崩壞、規則在時間壓力下被跳過、教訓檔變垃圾場、制度自我膨脹。}}
+{{List 3–4. Each: one sentence for the degradation scenario + one sentence for the prevention (the
+prevention has to point at a specific file/rule, not just "be careful"). Common degradations: an index path
+rots → trust collapses, rules get skipped under time pressure, the lessons file turns into a junk drawer,
+the system bloats itself.}}
 
-1. **{{退化方式}}**：{{情境}}。預防：{{具體機制}}。
+1. **{{degradation mode}}**: {{scenario}}. Prevention: {{concrete mechanism}}.
 
-## 我對哪些產出信心最低（誠實排序）
+## Ranked honestly: which outputs I trust least
 
-{{這節最重要，不許空。每項：產出 + 為什麼信心低 + 接手者第一件該做的驗證。
-沒實測的數字、單一來源的查證、可能過度設計的建議，都屬於這裡。}}
+{{This section matters most — it cannot be empty. Each item: the output + why confidence is low + the
+first thing whoever takes over should verify. Unmeasured numbers, single-source verification, advice that
+might be over-engineered — all of that belongs here.
 
-1. **{{產出}}**：{{為什麼低 + 怎麼驗}}。
+Example of the level of concreteness expected: "The '80% recoverable' figure — a structured estimate, zero
+measurement. Verify by redoing three past tasks with the new workflow and comparing output quality." A
+vague entry like "some numbers might be off" doesn't meet the bar — name the specific output and the
+specific check.}}
 
-## 最後
+1. **{{output}}**: {{why confidence is low + how to verify it}}.
 
-制度是拿來省判斷的，不是拿來崇拜的。哪條規則連續三次礙事，就帶著證據去問使用者要不要改。
+## Last thing
+
+The system exists to save judgment, not to be worshipped. If a rule gets in your way three times running,
+bring the evidence to the user and ask whether it should change.

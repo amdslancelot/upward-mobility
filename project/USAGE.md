@@ -1,110 +1,118 @@
-# USAGE — 怎麼用這套架構逼近 Fable 5 的表現
+# USAGE — how to use this architecture to close the gap on Fable 5
 
-> 讀者：使用者本人（次要讀者：主對話模型）。撰寫：2026-07-07，Fable 5 session。
-> 這套制度能替代什麼、不能替代什麼的完整評估 → `meta/AUDIT-2026-07-07.md`。
+> Reader: you, the user (secondary reader: the main-thread model). Written: 2026-07-07, Fable 5 session.
+> For the full assessment of what this pack can and can't substitute for → `meta/AUDIT-2026-07-07.md`.
 
-## 0. 心智模型（先讀這段再用）
+## 0. The mental model (read this before you use anything else)
 
-Fable 5 的優勢不是「每一步都更聰明」，而是三件事：拆解方向對、錯了自己發現、知道何時停。
-這套架構把前者換成「Opus 規劃＋你審計畫」，把後兩者換成「checklist＋fresh-context 驗證」。
-所以：**你的角色從「下指令的人」變成「審驗收條件和計畫的人」**。你多花的那兩分鐘審計畫，
-就是弱模型與 Fable 5 之間大部分的差距所在。省掉這兩分鐘，這套制度只剩一堆沒人讀的檔案。
+Fable 5's edge isn't "smarter at every single step." It comes down to three things:
 
-## 1. 每個 session 的標準流程
+1. It decomposes problems in the right direction.
+2. It catches its own mistakes.
+3. It knows when to stop.
 
-**開場**
-1. 選指揮官：`/model sonnet`（日常預設）。任務模糊、跨多檔架構、要做取捨 → `/model opus`。
-   注意：alias 實際對應哪個版本（sonnet-4-6 已 legacy、sonnet-5 現役）以 `/model` 介面顯示為準，詳見 `ops/model-dispatch.md` 可用資源節。
-   **永遠不要用 haiku 當指揮官**——它的派工判斷與驗收條件品質撐不起這套制度；haiku 只當 subagent。
-2. 新任務與上一件事無關 → 先 `/clear`（指揮官會從 CLAUDE.md 索引重建，便宜且不失真）。
+This architecture swaps the first for "Opus plans, you audit the plan," and swaps the other two for "checklists + fresh-context verification."
 
-**中段（指揮官照制度自動做，你只需監督兩點）**
-- 它有沒有派工（大量讀檔、掃 repo、驗證都該派）。看到它自己連續 grep/讀大檔 → 用第 3 節的觸發句拉回。
-- 它宣稱完成時有沒有執行證據。只有「我改好了」沒有測試輸出/read-back → 回一句「驗證不自驗，派 fresh-context 驗」。
+So here's the thing: **your role shifts from "the person giving orders" to "the person auditing acceptance criteria and plans."** Those two extra minutes you spend auditing the plan are exactly where most of the gap between a weak model and Fable 5 lives. Skip those two minutes, and this whole pack is just a pile of files nobody reads.
 
-**收尾**
-- 同一件事沒做完要休息 → 確認結論已存檔，然後 `/compact 保留檔案路徑、行號、未完成事項`。
-- 換一件事 → `/clear`。
-- 重大 session（立制度、大決策）→ 要求模型照 `meta/letter-template.md` 寫交接信。
+## 1. The standard flow for every session
 
-## 2. 額度分配：貴模型在前、便宜模型在後
+**Opening moves**
+1. Pick your commander: `/model sonnet` (the everyday default). Task is ambiguous, spans many files architecturally, or requires trade-off calls → `/model opus`.
+   Note: which actual version an alias points to (sonnet-4-6 is legacy, sonnet-5 is current) is whatever the `/model` interface shows you. See the "available resources" section of `ops/model-dispatch.md` for details.
+   **Never use haiku as commander.** Its delegation judgment and the quality of its acceptance criteria can't carry this system; haiku is subagent-only.
+2. New task, unrelated to the last one → `/clear` first (the commander rebuilds itself from the CLAUDE.md index — cheap, and nothing gets lost in the process).
 
-判斷集中在任務前段（方向、拆解、驗收條件），執行集中在中後段。所以：
+**Midstream** (the commander follows the discipline automatically — you only need to watch two things)
+- Is it delegating? Bulk file reads, repo scans, and verification should all be delegated. See it grepping or reading big files itself, repeatedly? Pull it back with a trigger phrase from section 3.
+- Does its completion claim have execution evidence behind it? Just "I fixed it," no test output or read-back → say "Verification isn't self-verification — delegate to a fresh-context agent."
 
-| 階段 | 模型 | 花在哪 |
+**Wrapping up**
+- Stopping mid-task → confirm the conclusions are saved to a file, then `/compact keep file paths, line numbers, and unfinished items`.
+- Switching to a different task → `/clear`.
+- Major session (new discipline established, big decision made) → have the model write a handoff letter following `meta/letter-template.md`.
+
+## 2. Budget allocation: pricier model up front, cheaper model in back
+
+Judgment concentrates in the early part of a task (direction, decomposition, acceptance criteria); execution concentrates in the middle and later parts. So:
+
+| Phase | Model | Where it's spent |
 |---|---|---|
-| 規劃、拆解、定驗收 | opus（指揮官或 Plan agent） | 模糊需求的第一刀——弱模型最補不了的地方 |
-| 執行 | sonnet 指揮官 → 派 sonnet/haiku subagent | 已確認計畫的多輪執行 |
-| 驗證 | haiku（機械 read-back）/ sonnet（語義審查） | 便宜且必要，不省 |
+| Planning, decomposition, defining acceptance criteria | opus (commander or Plan agent) | The first cut at an ambiguous requirement — the spot a weak model can least make up for |
+| Execution | sonnet commander → delegates to sonnet/haiku subagents | Multi-round execution of an already-confirmed plan |
+| Verification | haiku (mechanical read-back) / sonnet (semantic review) | Cheap and non-negotiable — don't skip it |
 
-一句話版：**寧可用 opus 十分鐘定好計畫，不要用 sonnet 兩小時走錯方向。**
-「今晚就要、品質要頂」的單次任務：直接 `/model opus` 從頭到尾，別走制度流程——制度換的是額度，不是時間。
+The one-liner version: **spend ten minutes with opus getting the plan right, rather than two hours with sonnet going the wrong way.**
 
-## 3. 怎麼下 prompt（核心章節）
+For a one-off task that's due tonight and needs top quality: just run `/model opus` start to finish, skip the whole discipline flow. This system trades money for time, not the other way around.
 
-### 3.1 你的 prompt 要含三件事（與交辦三要素同構）
+## 3. How to write the prompt (the core section)
 
-1. **目標與動機**：做什麼、為什麼要。動機讓模型在邊界情況下往對的方向猜。
-2. **驗收條件**：怎樣算好。說不出來就用 3.2 的句式讓模型先提。
-3. **邊界**：哪些不要碰、哪些已決定不要重新討論。
+### 3.1 Your prompt needs three things (this mirrors the three required elements of a delegation brief)
 
-**壞例**：「幫我優化這個專案的效能。」
-（模糊需求＋無驗收＝弱指揮官會挑它擅長而非重要的地方做。）
+1. **Goal and motivation**: what to do, and why. The motivation is what lets the model guess in the right direction at edge cases.
+2. **Acceptance criteria**: what counts as good. Can't articulate it? Use the phrasing in 3.2 to have the model propose it first.
+3. **Boundaries**: what not to touch, what's already decided and isn't up for re-litigation.
 
-**好例**：「列表頁載入要 3 秒（目標 <1s），先找出瓶頸在前端還是查詢，回報證據後我們再決定修哪邊。
-不要動 schema。」（目標有數字、先診斷後動手、邊界明確。）
+**Bad example**: "Help me optimize this project's performance."
+(Vague goal + no acceptance criteria = a weak commander will work on what it's good at, not what matters.)
 
-### 3.2 重要任務：先計畫後執行（最便宜的品質槓桿）
+**Good example**: "The list page takes 3 seconds to load (target: <1s). First find out whether the bottleneck is frontend or the query, report back the evidence, and then we'll decide what to fix. Don't touch the schema."
+(The goal has a number, diagnosis comes before action, boundaries are explicit.)
 
-模糊或高風險任務，加這句：
+### 3.2 Important tasks: plan first, execute second (the cheapest quality lever there is)
 
-> 「先不要動手。給我：(1) 你對任務的理解 (2) 拆解步驟與每步派誰做 (3) 驗收條件。我確認後再執行。」
+For ambiguous or high-risk tasks, add this line:
 
-你審計畫時只看三件事：方向對嗎、驗收條件可判定嗎（有數字/可跑的檢查，而不是「做好」）、
-有沒有它自己補不了的假設。這一步是在替代 Fable 5 的「第一刀切對」，別跳過。
+> "Don't touch anything yet. Give me: (1) your understanding of the task (2) a breakdown of steps and who does each one (3) acceptance criteria. I'll confirm before you execute."
 
-### 3.3 觸發句（弱指揮官會漂移，用這些句子拉回制度）
+When you audit the plan, check exactly three things:
 
-| 情境 | 你說 |
+1. Is the direction right?
+2. Are the acceptance criteria decidable (numbers or runnable checks, not "make it good")?
+3. Are there assumptions it can't fill in on its own?
+
+This step substitutes for Fable 5's "gets the first cut right" — don't skip it.
+
+### 3.3 Trigger phrases (a weak commander drifts — use these to pull it back to the discipline)
+
+| Situation | You say |
 |---|---|
-| 它自己下場掃檔案、連續讀大檔 | 「指揮官不下場，照 ops/model-dispatch.md 派工。」 |
-| 它宣稱完成但沒證據 | 「照 ops/judgment-rubrics.md#2，給執行證據，驗證派 fresh-context。」 |
-| 它在同一個錯上打轉 | 「照 ops/judgment-rubrics.md#4 檢查是不是該換路，或帶失敗軌跡升級。」 |
-| 它在壞掉的狀態上疊第三個 fix、越改越亂 | 「先回滾到上一個綠燈檢查點，別在壞狀態上疊 fix，照 ops/judgment-rubrics.md#4 決定要 bisect 還是 re-plan。」 |
-| 它問你已有慣例可循的小事 | 「照 ops/judgment-rubrics.md#3，選常規預設繼續，回報時講一句就好。」 |
-| 開新 session 接續舊工作 | 「先讀 CLAUDE.md 索引，再讀任務相關的那份檔，不要整包掃。」 |
+| It's scanning files itself, reading big files back to back | "The commander doesn't descend — delegate per ops/model-dispatch.md." |
+| It claims done with no evidence | "Per ops/judgment-rubrics.md#2, give me execution evidence — delegate verification to a fresh-context agent." |
+| It's spinning on the same error | "Per ops/judgment-rubrics.md#4, check whether it's time to change approach, or escalate with the failure trace." |
+| It's stacking a third fix on a broken state, and things are getting messier | "Roll back to the last green checkpoint first — don't stack fixes on a broken state. Per ops/judgment-rubrics.md#4, decide whether to bisect or re-plan." |
+| It's asking you about something small that already has a convention | "Per ops/judgment-rubrics.md#3, pick the standard default and keep going — just mention it in one line in the report." |
+| Starting a new session to continue old work | "Read the CLAUDE.md index first, then just the file relevant to the task — don't scan the whole pack." |
 
-指名檔案有用：弱模型對「照規則做」反應模糊，對「照 X 檔 #N 節做」反應精確。
+Naming the file matters. A weak model responds vaguely to "follow the rules," and precisely to "follow section N of file X."
 
-### 3.4 模糊題與品味題（弱模型的天花板，換打法）
+### 3.4 Ambiguous questions and taste calls (a weak model's ceiling — change tactics here)
 
-- **拆解方向模糊**：`/model opus` ＋ 3.2 句式，要求「給兩個方案，各附理由與風險，你推薦哪個」。你選，sonnet 執行。
-- **品味／感官（UI 手感、文案語氣、動畫）**：不要讓任何模型自由發揮。要求 A/B 兩版你選，
-  或先建立可量測的代理指標（載入毫秒數、可讀性分數）。判準見 `ops/judgment-rubrics.md`#6。
-- **高風險判斷**：要求多答案評審——「這題分別讓兩個 agent 獨立作答，再派第三個比對分歧給我看。」
-  分歧點就是需要你仲裁的地方；沒分歧的部分可以放心。
+- **Decomposition direction is unclear.** `/model opus` + the 3.2 phrasing, asking it to "give me two options, each with reasoning and risk, and tell me which you'd recommend." You choose, sonnet executes.
+- **Taste / feel** (UI feel, copy tone, animation). Don't let any model freewheel here. Ask for two versions, A and B, and you pick — or first establish a measurable proxy metric (load time in ms, a readability score). See the criteria in `ops/judgment-rubrics.md`#6.
+- **High-stakes judgment calls.** Ask for a multi-answer panel: "Have two agents answer this independently, then have a third compare where they diverge and show me." The divergence points are exactly what needs your arbitration. Where they agree, you can trust it.
 
-### 3.5 委託大任務（一次交辦一個下午的工作量）
+### 3.5 Delegating large tasks (handing off a whole afternoon of work in one go)
 
-多產出、要品質迴圈（列清單→執行→派審查→回頭修訂）的任務，抄 `WEAK-MODEL-PROMPT-GUIDE.md` 的完整骨架——它把「審查完回頭修改前一輪產出」寫成明文義務，弱模型才會照做；第一次用先看該檔「教學：照做一次」節的完整範例。簡版骨架如下：
+For multi-output tasks that need the full quality loop (list tasks → execute → delegate review → go back and revise), copy the full skeleton from `WEAK-MODEL-PROMPT-GUIDE.md`. It spells out "go back and revise after review" as an explicit obligation, which is the only way a weak model actually does it. First time using it, read the "worked example" section in that file in full. Here's the short version of the skeleton:
 
-> 「任務：[目標與動機]。
-> 規則：照 CLAUDE.md 制度做——派工查 ops/model-dispatch.md，交辦抄 ops/prompt-templates.md 範本，
-> 每完成一項存檔再做下一項，全部完成後派 fresh-context agent 驗證，最後給我一頁總結。
-> 驗收：[逐條可判定條件]。
-> 卡住兩輪就停下來寫明狀況，不要硬做。」
+> "Task: [goal and motivation].
+> Rules: follow the CLAUDE.md discipline — check ops/model-dispatch.md before delegating, copy templates from ops/prompt-templates.md for delegation briefs,
+> save after finishing each item before moving to the next, delegate to a fresh-context agent to verify everything once done, then give me a one-page summary.
+> Acceptance criteria: [itemized, decidable conditions].
+> If you're stuck for two rounds, stop and write up the situation — don't force it."
 
-## 4. 這套架構補不了的（期望管理）
+## 4. What this architecture can't make up for (managing your expectations)
 
-1. **品味與感官品質**——上面 3.4 的打法只是把選擇權還給你，不是讓模型變有品味。
-2. **「不知道自己不知道」**——弱指揮官不會意識到它漏問了關鍵問題。緩解：3.2 的計畫審查由你把關。
-3. **極長跨度的一致性**——跨多 session 的大工程，靠交接信與 meta/lessons.md 接力，但每次接手都有損耗。
-   大工程切成可獨立驗收的段落，每段一個 session。
+1. **Taste and sensory quality.** The tactics in 3.4 above just hand the choice back to you; they don't make the model tasteful.
+2. **"Not knowing what it doesn't know."** A weak commander won't realize it failed to ask a critical question. Mitigation: you're the backstop on the plan review in 3.2.
+3. **Consistency over very long spans.** For large projects spanning many sessions, handoff letters and meta/lessons.md carry the baton forward, but every handoff loses something. Break large projects into independently-acceptable segments, one per session.
 
-## 5. 反模式（見過就要改的用法）
+## 5. Anti-patterns (fix these the moment you spot them)
 
-- ❌ 把這包檔案放著不提，期待模型自己讀——CLAUDE.md 會常載，但 session 中段的漂移要靠你的觸發句。
-- ❌ haiku 當指揮官省錢——省下的錢會在返工時加倍付掉。
-- ❌ 跳過驗證派工「因為任務很簡單」——驗證是制度裡唯一不依賴模型誠實的防線。
-- ❌ 用 /compact 代替存檔——compact 會丟行號與細節；先存檔，壓縮只是順帶。
-- ❌ 每個小問題都開新 subagent——答案已在對話裡的一句話題直接問，派工判準見 `ops/model-dispatch.md`「成本直覺」節。
+- Leaving this pack's files sitting unmentioned, expecting the model to read them on its own. CLAUDE.md loads every session, but drift mid-session still needs your trigger phrases.
+- Using haiku as commander to save money. Whatever you save gets paid back double in rework.
+- Skipping the delegated verification step "because the task is simple." Verification is the one line of defense in this whole system that doesn't depend on the model being honest.
+- Using /compact instead of saving to a file. Compact drops line numbers and detail; save first, compaction is secondary.
+- Spinning up a new subagent for every tiny question. If the answer's already sitting in the conversation, just ask it directly. See the "cost intuition" section of `ops/model-dispatch.md` for the delegation criteria.

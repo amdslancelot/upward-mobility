@@ -1,72 +1,81 @@
 ---
 name: ops-plan
-description: 大任務的品質迴圈編排（brief→計畫→執行→審查→修訂）。開始多產出/多步/半天以上、或產出要長期沿用的大任務時用：先寫 brief（目標/驗收/假設/風險）釘死方向再拆 plan.md、逐項執行存檔記檢查點、完成後派 fresh-context 審查、逐條處置 findings 回頭改。Use when starting a large multi-step or multi-output task that needs the full plan-execute-review-revise loop; skip for single-file or one-off work.
+description: Quality-loop orchestration for large tasks (brief → plan → execute → review → revise). Use this when starting a task with multiple deliverables, multiple steps, half a day or more of work, or output meant to stick around long-term — write the brief first (goal, acceptance criteria, assumptions, risks) to pin the direction, then break it into plan.md, execute item by item saving checkpoints, dispatch a fresh-context review when done, and work through every finding by going back and fixing the source. Use when starting a large multi-step or multi-output task that needs the full plan-execute-review-revise loop; skip for single-file or one-off work.
 ---
 
-# 大任務生命週期：brief → 計畫 → 執行 → 審查 → 修訂（模型自套）
+# The Lifecycle of a Large Task: brief → plan → execute → review → revise (self-applied by the model)
 
-> 讀者：主對話模型。這是「多產出大任務」的主動編排層——把高階模型的工作本能寫成你自己照走的步驟。
-> 何時用見末節；小任務不要用（整套固定成本會吃掉收益）。
-> 使用者手動驅動版（人下 prompt 用的骨架）見來源 repo 的 `WEAK-MODEL-PROMPT-GUIDE.md`；兩份是同一迴圈的兩個讀者，改一份要順手檢查另一份。
+> Reader: the main-thread model. This is the active orchestration layer for "large task, multiple deliverables" — it takes a senior model's working instincts and writes them down as steps you follow yourself.
+> See the last section for when to use this; skip it for small tasks (the fixed overhead of the whole loop eats the benefit).
+> The human-driven version of this (the skeleton a person types prompts against) lives in the source repo's `WEAK-MODEL-PROMPT-GUIDE.md`. Both files are readers of the same loop — if you edit one, check the other.
 
-## 解決的問題
+## The problem this solves
 
-Sonnet 等級的指揮官預設「執行完就宣稱完成」：不會自發列任務清單、不會先確認方向、不會主動派審查、收到 findings 只會轉述給使用者而不回頭改自己的產出。這個迴圈是高階模型的本能，弱模型要靠明文步驟才跑得動。最貴的錯是方向切錯後完美執行——所以第 0 階段的 brief 不能跳。
+A Sonnet-tier commander defaults to "I executed, therefore I'm done": it won't spontaneously write a task list, won't confirm direction before starting, won't proactively dispatch a review, and when findings come back it'll just relay them to the user instead of going back to fix its own output. This loop is a senior model's instinct — a weaker model only runs it when the steps are spelled out explicitly. The most expensive mistake is flawless execution in the wrong direction — which is why phase 0's brief can't be skipped.
 
-## plan.md 模板（開工前建，全程維護）
+## plan.md template (create before starting work, maintain throughout)
 
 ```
-# <任務名> — plan.md
-狀態：<計畫中／執行:第 N 項／審查中／修訂中>　更新：<日期>
+# <task name> — plan.md
+Status: <planning / executing: item N / reviewing / revising>   Updated: <date>
 
-## Brief（動工前釘死；這一段在替代高階模型的「第一刀切對」）
-- 目標與動機：<做什麼、為什麼>
-- 驗收條件（可判定，逐條）：<「照做能跑到測試綠」可以；「寫清楚」不行>
-- 假設：<你為了往下做而假設為真的事——出事時先回這格查是不是假設錯了>
-- 風險 / 不做什麼：<已知風險、明確排除的範圍>
+## Brief (pinned down before work starts; this section stands in for a senior model's "get the first cut right")
+- Goal and motivation: <what to do, why>
+- Acceptance criteria (decidable, itemized): <"following these steps gets tests green" is fine; "written clearly" is not>
+- Assumptions: <things you're taking as true in order to proceed — if something breaks, check this first for a wrong assumption>
+- Risks / out of scope: <known risks, explicitly excluded scope>
 
-## 任務清單
-- [ ] 1. <項目> — 驗收：<可判定標準>
+## Task list
+- [ ] 1. <item> — Acceptance: <decidable criterion>
 - [ ] 2. ...
 
-## 檢查點（每里程碑通過驗收就記）
-- <里程碑> → <git commit：sha 或一句描述>
+## Checkpoints (log one every time a milestone passes its acceptance criteria)
+- <milestone> → <git commit: sha or one-sentence description>
 
-## 修訂記錄（審查後填）
-- <finding> → 改了 <檔:行> ｜ 或 駁回：<一句理由>
+## Revision log (fill in after review)
+- <finding> → fixed at <file:line> | or rejected: <one-sentence reason>
 ```
 
-## 五個階段（你自己照走）
+## The five phases (walk through these yourself)
 
-**階段〇 — brief（動工前）**：把目標、驗收條件、假設、風險寫進 plan.md 開頭。方向不確定（需求模糊、你在替使用者假設偏好或商業脈絡）→ 停下確認再動工，判準見 `ops-judge` skill#3。這步別跳：切錯方向的完美執行是最貴的失敗。
+**Phase 0 — brief (before starting work)**: write the goal, acceptance criteria, assumptions, and risks into the top of plan.md. If the direction is uncertain (requirements are vague, or you're guessing at the user's preferences or business context) → stop and confirm before starting work; see `ops-judge` skill#3 for the criteria. Don't skip this step: flawless execution in the wrong direction is the most expensive failure there is.
 
-**階段一 — 計畫**：把任務拆成清單，每項附可判定驗收，凍進 plan.md。中段漂移或 `/compact` 後，這份檔案是你找回任務清單的錨。
+**Phase 1 — plan**: break the task into a list, attach decidable acceptance criteria to each item, freeze it into plan.md. If you drift mid-task or hit a `/compact`, this file is the anchor that gets you back to your task list.
 
-**階段二 — 執行**：逐項做，每完成一項立即存檔並在 plan.md 勾掉，再做下一項；每里程碑（一項、或一批相關項通過驗收）就 git commit 記檢查點。派工照 `ops-dispatch` skill、交辦抄 `ops-dispatch` skill。某項修兩次仍失敗 → 先回滾到上一個檢查點、別在壞狀態上疊第三個 fix，再照症狀分兩支：像 **regression**（打地鼠般連錯、同一錯誤原樣重現、以前會跑現在不會）就逐一重放改動、定位單一 culprit（bisect）；像**方法錯**（在對抗工具／框架、要碰的檔比預估多一倍）就別 bisect、直接 re-plan 或帶失敗軌跡升級。完整判準見 `ops-judge` skill#4。
+**Phase 2 — execute**: work through items one at a time. The moment an item is done, save it and check it off in plan.md before starting the next one. At every milestone (one item, or a batch of related items, passing acceptance) commit to git as a checkpoint. Dispatch per `ops-dispatch` skill; write delegation briefs from its templates.
 
-**階段三 — 審查**：全部項目完成後，派一個新開的 fresh-context agent 審查全部產出（model 選法：haiku 驗機械項如檔案存在／行數／grep，sonnet 驗語義項如矛盾／歧義／未驗證宣稱，不確定往上選一級；完整選法與 prompt 加料見 `ops-review` skill）。審查面向逐條給它，要求每個 finding 附 檔案:行號＋嚴重度、無發現的面向明說「查了、無發現」、不要改任何檔案。
+If an item still fails after two fix attempts → roll back to the last checkpoint first (don't stack a third fix on broken state), then split by symptom:
+- Looks like a **regression** (whack-a-mole failures, the same error resurfacing verbatim, something that used to work and doesn't anymore) → replay changes one at a time and bisect to the single culprit.
+- Looks like a **wrong approach** (fighting the tool/framework, the files you need to touch are more than double your estimate) → don't bisect; re-plan directly or escalate with the failure trace.
 
-**階段四 — 修訂**：收到 findings 後逐條處置——採納就回頭修改對應產出（不是轉述給使用者就停，這是整個迴圈的核心義務），駁回寫一句理由，更新 plan.md 修訂記錄。0 條未處理才算完成；審查修訂最多兩輪，第二輪後還有 finding 就列出來問使用者。
+Full criteria in `ops-judge` skill#4.
 
-**完成的定義：階段四結束，不是階段二結束。**
+**Phase 3 — review**: once every item is complete, dispatch a freshly spawned fresh-context agent to review the entire output (model choice: haiku for mechanical checks like file existence/line counts/grep, sonnet for semantic checks like contradictions/ambiguity/unverified claims — if unsure, pick the higher tier; full selection guidance and prompt add-ons are in the `ops-review` skill). Give it the review dimensions explicitly, item by item. Require every finding to come with file:line and severity, require it to explicitly state "checked, nothing found" for aspects with no findings, and forbid it from editing any files.
 
-## 每個設計防弱模型的哪個毛病
+**Phase 4 — revise**: work through every finding one by one — accept it and go fix the underlying output (not just relay it to the user and stop; this is the core obligation of the entire loop), or reject it with a one-sentence reason, and update plan.md's revision log. Only 0 unresolved findings counts as done. Cap review-revise at two rounds; if findings remain after the second round, list them out and ask the user.
 
-| 設計 | 防什麼 |
+**The definition of done is the end of phase 4, not the end of phase 2.**
+
+Good: review comes back with 4 findings → you fix 3 at the source, reject 1 with a reason, log all 4, then report "done: 3 fixed, 1 rejected."
+Bad: review comes back with 4 findings → you paste them to the user and stop. Relaying findings is not revising; phase 2 was never the finish line.
+
+## What each design choice guards against in a weaker model
+
+| Design | Guards against |
 |---|---|
-| brief 先釘死＋方向不確定就停 | 第一刀切錯方向——弱指揮官最大缺口 |
-| 假設寫成一格 | 出事時有回溯點：先查是不是早先某個假設錯了，而非死盯報錯那行 |
-| 計畫凍結成 plan.md | 中段漂移的錨；`/compact` 不會丟 |
-| 每項完成立即存檔 | session 隨時可能中斷，存了的才算數；也給審查員留可讀產出 |
-| 每里程碑檢查點＋失敗先回滾 | 弱模型預設往壞狀態疊 fix；檢查點讓它回到 known-good 再 bisect 或 re-plan |
-| 審查員 fresh-context＋禁改檔 | 驗證不自驗；審查員只回報，採納與否是指揮官的判斷 |
-| 「回頭修改對應產出」寫成明文 | 弱模型預設把 findings 轉述就停，不會自己回去改前一輪結果 |
-| 「駁回寫理由」 | 防全盤照收（審查員有假陽性）與全盤忽略兩個極端 |
-| 「最多兩輪」 | 防審查↔修訂無限迴圈燒額度 |
-| 完成定義放最後 | 弱模型認最後看到的明確定義；不寫就在階段二收工 |
+| Pin the brief first + stop when direction is uncertain | Getting the first cut wrong — the biggest gap in a weaker commander |
+| Assumptions written into their own field | A rollback point when things break: check whether an earlier assumption was wrong, instead of staring at the line that threw the error |
+| Plan frozen into plan.md | An anchor against mid-task drift; survives `/compact` |
+| Save immediately after every item completes | The session can be interrupted anytime — only what's saved counts; also leaves the reviewer something readable |
+| Checkpoint per milestone + roll back on failure | A weaker model defaults to stacking fixes on broken state; checkpoints let it return to known-good before bisecting or re-planning |
+| Reviewer is fresh-context + forbidden from editing | Verification isn't self-verification; the reviewer only reports, accepting or rejecting is the commander's judgment call |
+| "Go back and fix the underlying output" spelled out explicitly | A weaker model defaults to relaying findings and stopping, instead of going back to fix the prior round's results itself |
+| "Rejections need a reason" | Guards against both extremes: rubber-stamping everything (reviewers have false positives) and ignoring everything |
+| "Max two rounds" | Guards against an infinite review-revise loop burning budget |
+| Definition of done placed last | A weaker model latches onto whatever explicit definition it saw most recently; leave it out and it'll call phase 2 the finish line |
 
-## 什麼時候用、什麼時候不用
+## When to use this, and when not to
 
-- **用**：多項產出的任務（半天以上工作量）、產出要長期沿用（制度檔、對外文件、核心程式碼）、錯誤成本高於一輪審查成本（一輪約 35–40k subagent tokens，見 `ops-review` skill 成本節）。
-- **不用**：單檔小改、一次性草稿、答案已在對話裡的問題——整套固定成本吃掉收益，直接做＋輕量驗證即可。
-- **縮減版（中型、方向明確）**：省掉階段〇/一的往返，但保留「做完派 fresh-context 審查 → 逐條處置回頭改 → 修完才回報」這條不可省的核心義務。
+- **Use it**: tasks with multiple deliverables (half a day or more of work), output meant to stick around long-term (operating-rule files, external-facing docs, core code), or when the cost of a mistake exceeds the cost of one review round (roughly 35-40k subagent tokens per round — see the cost section of `ops-review` skill).
+- **Don't use it**: a small single-file edit, a one-off draft, a question whose answer is already sitting in the conversation — the full loop's fixed cost eats the benefit; just do the work plus a lightweight check instead.
+- **Scaled-down version (medium-sized, direction already clear)**: skip the back-and-forth of phases 0/1, but keep the one non-negotiable core obligation: dispatch a fresh-context review when done → work through every finding by fixing the source → only report back once revisions are done.

@@ -1,94 +1,102 @@
-# 任務交辦 prompt 範本
+# Delegation prompt templates
 
-> 用法：主對話派 subagent 時，抄對應範本填空。`[ ]` 是必填空格。省略任何一個必填欄就不要派工。
-> agent type 與 model 選法見 `ops/model-dispatch.md` 派工對照表。
+> Usage: when the main conversation dispatches a subagent, copy the matching template and fill in the blanks. `[ ]` marks a required field. Skip any required field and you don't dispatch.
+> See the delegation reference table in `ops/model-dispatch.md` for how to pick agent type and model.
 
-## 通用結構（所有範本共用）
-
-```
-背景：[一兩句：這個 repo 是什麼、我在做什麼、為什麼需要這個子任務]
-任務：[具體要做的事]
-範圍：[哪些檔/目錄在範圍內；明確說哪些不要碰]
-驗收條件：[可判定的完成標準，逐條]
-回報格式：[結論 + 檔案:行號；長產物寫到 (路徑) 回傳路徑；不要貼原始碼全文/完整 log]
-```
-
-## 1. 搜尋（investigator/Explore，haiku/sonnet）
+## Common structure (shared by every template)
 
 ```
-背景：repo 在 [路徑]，是 [一句話描述]。我需要 [動機]。
-任務：找出 [目標：定義/呼叫點/資料流/慣例]。搜這些關鍵詞起手：[詞1, 詞2, ...]。
-範圍：[src/ 全部 | 限定目錄]。只讀不改。
-驗收條件：每個發現附 檔案:行號；找不到就列出搜過的 pattern 與目錄（證明找過，不是漏找）。
-回報格式：file:line 表格，每行一句說明，總長 ≤ 40 行。不要建議修法。
+Background: [one or two sentences: what this repo is, what I'm doing, why this subtask is needed]
+Task: [the specific thing to do]
+Scope: [which files/directories are in scope; explicitly say what NOT to touch]
+Acceptance criteria: [judgable completion standards, itemized]
+Report format: [conclusion + file:line; long output goes to a (path), return the path; don't paste raw source/full logs]
 ```
 
-## 2. 實作（general-purpose/builder，sonnet）
+## 1. Search (investigator/Explore, haiku/sonnet)
 
 ```
-背景：[repo + 功能脈絡]。相關檔案：[檔案清單 + 每個一句話功能]（你——接單的 subagent——先讀完這些再動手；指揮官不必先讀）。
-任務：[要實作的行為，含輸入/輸出/邊界情況]。
-範圍：預計改 [檔案清單]。要新增檔案先在回報中說明為什麼。不碰 [排除清單]。
-慣例：跟隨周邊程式碼的命名與風格；不加新依賴；不做範圍外的重構。
-驗收條件：
-- [build 指令] 通過（0 error）
-- [具體行為驗證：測試 X 綠 / 實跑 Y 路徑輸出 Z]
-- diff 只含任務相關改動
-回報格式：改了哪些檔（file:line 級別）、驗證怎麼跑的與結果、留下的已知限制。失敗就回報失敗原因與已試方案，不要交「理論上可行」的未驗證碼。
+Background: the repo is at [path], it's [one-sentence description]. I need [motivation].
+Task: find [target: definitions/call sites/data flow/conventions]. Start by searching these keywords: [term1, term2, ...].
+Scope: [all of src/ | a specific directory]. Read-only, no edits.
+Acceptance criteria: every finding carries a file:line; if nothing's found, list the patterns and directories searched (proof you looked, not that you missed it).
+Report format: a file:line table, one sentence per row, ≤ 40 lines total. Don't suggest fixes.
 ```
 
-## 3. 重構（general-purpose，sonnet；範圍大先派 Plan）
+## 2. Implementation (general-purpose/builder, sonnet)
 
 ```
-背景：[為什麼要重構：重複/耦合/準備 X 功能]。
-任務：把 [現狀] 改成 [目標形狀]。行為不得改變。
-範圍：[檔案清單]。呼叫端共 [N] 處（先 grep 確認，數字對不上就停下回報）。
-驗收條件：
-- 重構前先跑一次 [測試/build] 記錄基線，重構後結果與基線一致
-- 舊介面呼叫點全部遷移，grep [舊名稱] 為 0 hits
-- 無行為變更（不順手修 bug、不順手改格式）
-回報格式：遷移對照表（舊→新）、基線比對結果、grep 證據。
+Background: [repo + feature context]. Relevant files: [file list + one-line purpose for each] (you — the subagent taking this on — read these fully before touching anything; the commander doesn't need to read them first).
+Task: [the behavior to implement, including inputs/outputs/edge cases].
+Scope: expected to touch [file list]. If you need to add a new file, explain why in your report. Do not touch [exclusion list].
+Conventions: follow the naming and style of surrounding code; no new dependencies; no out-of-scope refactoring.
+Acceptance criteria:
+- [build command] passes (0 errors)
+- [specific behavior verification: test X green / actually run path Y and confirm output Z]
+- the diff contains only task-relevant changes
+Report format: which files changed (file:line level), how you verified it and the result, any known limitations left behind. If it fails, report the failure reason and what you already tried — don't hand back unverified code that "should work in theory."
 ```
 
-## 4. 研究（general-purpose + WebSearch，sonnet）
+## 3. Refactoring (general-purpose, sonnet; use a Plan agent first if scope is large)
 
 ```
-背景：[要做的決定] 需要 [哪類事實] 支撐。
-任務：查證以下問題：[問題清單]。
-來源要求：官方文件/官方 repo 優先；每個事實附來源 URL；查不到就標 UNVERIFIED，禁止用訓練記憶填（特別是版本號、API 參數、價格）。
-驗收條件：每個問題都有「答案+來源」或「UNVERIFIED+查過哪裡」。
-回報格式：事實清單，每條 ≤ 2 行 + URL。長引文存 [暫存路徑] 回傳路徑。
+Background: [why refactor: duplication/coupling/prep for feature X].
+Task: change [current shape] into [target shape]. Behavior must not change.
+Scope: [file list]. Call sites total [N] (grep to confirm first; if the number doesn't match, stop and report).
+Acceptance criteria:
+- run [tests/build] once before refactoring to record a baseline; results after must match the baseline
+- every call site on the old interface is migrated; grep for [old name] returns 0 hits
+- no behavior changes (no drive-by bug fixes, no drive-by formatting changes)
+Report format: a migration table (old → new), baseline comparison results, grep evidence.
 ```
 
-## 5. 審查（reviewer/fresh-context，sonnet）— 類型/model 選法與 prompt 加料見 `ops/review-dispatch.md`
+## 4. Research (general-purpose + WebSearch, sonnet)
 
 ```
-背景：[這個 diff/檔案 是為了什麼]。
-任務：審查 [diff 範圍 / 檔案清單]，只找 [正確性 bug | 弱模型會誤讀的模糊句 | 規則互相矛盾 | 過度工程]（選一個焦點，一次審一種）。
-驗收條件：每個 finding 一行：位置 + 問題 + 建議修法 + 嚴重度。沒問題的部分不要寫（不要 praise）。
-回報格式：finding 清單按嚴重度排序；0 findings 就明說「檢查了 X/Y/Z 面向，無發現」。
-特別檢查：[本次特有的風險點]
+Background: [the decision to be made] needs [what kind of facts] to back it up.
+Task: verify the following questions: [question list].
+Source requirements: prefer official docs/official repos; every fact carries a source URL; if you can't find it, mark UNVERIFIED — never fill gaps from training memory (especially version numbers, API parameters, prices).
+Acceptance criteria: every question has either "answer + source" or "UNVERIFIED + where you looked."
+Report format: a fact list, ≤ 2 lines + URL per item. Long quotes go to [scratch path], return the path.
 ```
 
-## 6. 追加/貼內容進檔案（builder，haiku）— 含血淚教訓的修正版
+## 5. Review (reviewer/fresh-context, sonnet)
+
+See `ops/review-dispatch.md` for type/model selection and prompt add-ons.
 
 ```
-任務：在 [檔案路徑]（目前 [N] 行）最尾端追加內容。
-要追加的內容 = 下方 ```append 圍欄之間的文字。圍欄本身不是內容，不准出現在檔案裡。一字不改，不動既有內容。
+Background: [what this diff/file is for].
+Task: review [diff scope / file list], looking only for [correctness bugs | ambiguous phrasing a weak model would misread | rules that contradict each other | over-engineering] (pick one focus, review one kind at a time).
+Acceptance criteria: one line per finding: location + problem + suggested fix + severity. Don't write anything about the parts that are fine (no praise).
+Report format: a finding list sorted by severity; if there are 0 findings, say explicitly "checked X/Y/Z dimensions, no findings."
+Special focus: [risk points specific to this review]
+```
+
+## 6. Appending/pasting content into a file (builder, haiku)
+
+The hardened version, with a hard-won lesson baked in: builders will copy the fence markers themselves into the file unless you tell them not to.
+
+```
+Task: append content to the end of [file path] (currently [N] lines).
+The content to append = the text between the ```append fences below. The fence markers themselves are not content — they must never end up in the file.
+Do not change a single character of, or otherwise touch, the existing content.
 
 ```append
-[內容]
+[content]
 ```
 
-驗收條件（全過才回報成功）：
-1. grep 圍欄標記在目標檔為 0 hits。
-2. 新內容起始行號 > [N]（確實在尾端）。
-3. 既有 1–[N] 行 byte 不變。
-回報格式：追加起始與結束行號 + 三條驗收各 PASS/FAIL。
+Acceptance criteria (all must pass before you report success):
+1. Grepping for the fence markers in the target file returns 0 hits.
+2. The new content's starting line number > [N] (confirms it landed at the end).
+3. The existing lines 1–[N] are byte-identical to before.
+Report format: start and end line numbers of the appended content + PASS/FAIL for each of the three acceptance criteria.
 ```
 
-## 派工後的主對話義務
+Good: prompt says "the ```append fences are not content, do not copy them into the file" and lists grep-for-marker as acceptance criterion 1 → builder appends clean, grep returns 0 hits.
+Bad: prompt just says "append the text below" with a fence around it → builder pastes the fence lines too, and nothing in the acceptance criteria would have caught it.
 
-- 收到回報先對驗收條件逐條核對，過了才採用；沒過按升降級路徑處理（`ops/model-dispatch.md`）。
-- 回報的行號/數字有矛盾時，主對話必須自己讀檔驗證，再回報使用者。
-- 回報裡的結論轉述給使用者時，用完整句子重述，不要原樣轉貼 subagent 的壓縮輸出。
+## The main conversation's obligations after dispatching
+
+- When the report comes back, check it against acceptance criteria item by item first. Only adopt it once it passes; if it doesn't pass, follow the escalation ladder (`ops/model-dispatch.md`).
+- If line numbers/figures in the report contradict each other, the main conversation must read the file itself to verify before reporting to the user.
+- When relaying a report's conclusions to the user, restate them in full sentences — don't paste the subagent's compressed output verbatim.

@@ -1,53 +1,65 @@
-# 維護協議
+# Maintenance Protocol
 
-> 這套制度檔會腐化。本檔規定誰能改什麼、教訓寫回哪裡、多長要精簡。
+> Operating-discipline files rot. This document specifies who can change what, where lessons get written
+> back to, and how long a file has to get before it needs trimming.
 
-## 權限分級
+## Permission tiers
 
-**弱模型可自行改（不必問使用者）**：
-- CLAUDE.md 索引：加一行指向新檔、修正失效路徑、更新一句話描述。
-- `ops/model-dispatch.md` 的「查證過的可用資源」節：發現型號/參數過期時，先查證（官方文件或 harness 環境實測）再更新，並改掉查證日期。
-- 設計文件的狀態標記更新（「設計評估」→「已實作」）。
-- 踩雷教訓的追加（格式見下）。
+**A weak model can change these on its own (no need to ask the user)**:
+- The CLAUDE.md index: adding a line pointing to a new file, fixing a broken path, updating a one-line description.
+- The "Verified Available Resources" section of `ops/model-dispatch.md`: when a model/parameter is found to be stale, verify it first (official docs or an actual test in the harness environment), then update it and change the verification date.
+- Status labels in design docs ("design under review" → "implemented").
+- Appending a new lesson learned the hard way (format below).
 
-**動之前必須問使用者**：
-- 刪除或重寫任何制度檔的整節。
-- 改 `ops/judgment-rubrics.md` 的規則本體（判準是制度核心，弱模型不自改判準 — 這是防退化的主閘）。
-- 改 `.claude/settings.json`、hooks、plugin 設定。
-- 任何「我覺得這條規則不對」的情況 — 不對就回報，不要繞過。
+**Must ask the user before touching these**:
+- Deleting or rewriting an entire section of any operating-discipline file.
+- Changing the rule bodies in `ops/judgment-rubrics.md` (the rubrics are the system's core — a weak model doesn't get to self-edit the rubric; this is the main gate against degradation).
+- Changing `.claude/settings.json`, hooks, or plugin config.
+- Any "I think this rule is wrong" situation — report it, don't route around it.
 
-## 踩雷教訓寫回哪裡、什麼格式
+For example: finding a broken path in the CLAUDE.md index and fixing it yourself is fine (tier one).
+Deciding the escalation ladder in `ops/judgment-rubrics.md` is "too strict" and loosening it yourself is
+not — that's a rule-body change, ask first.
 
-觸發：任何「重試兩輪才解掉」或「方向錯了換路」的事件（判準見 ops/judgment-rubrics.md#4）。
+## Where lessons learned the hard way get written, and in what format
 
-寫到：`meta/lessons.md`（不存在就建立），**追加不改舊條目**，格式：
+Trigger: any event where "it took two retries to fix" or "the approach was wrong and we changed course"
+(rubric for this: `ops/judgment-rubrics.md`#4).
+
+Write to `meta/lessons.md` (create it if it doesn't exist). Append, never edit existing entries, in this format:
 
 ```
-## YYYY-MM-DD [一句話標題]
-- 症狀：[當時看到什麼]
-- 錯誤路徑：[試了什麼、為什麼不行]
-- 正解：[最後怎麼解的]
-- 規則化：[一句可照做的預防規則；值得常載就同時在 CLAUDE.md 索引加一行]
+## YYYY-MM-DD [one-line title]
+- Symptom: [what you observed at the time]
+- Wrong path: [what was tried, and why it didn't work]
+- Fix: [how it actually got resolved]
+- Rule extracted: [one actionable sentence to prevent recurrence; if it's worth keeping loaded at all times, also add a line to the CLAUDE.md index]
 ```
 
-跨 session 的使用者偏好/專案脈絡（非 repo 可推導的）→ 寫到記憶目錄（本環境：`~/.claude/projects/-Users-lans-h-Documents-claude-main/memory/`），一事一檔 + MEMORY.md 索引一行。repo 已記載的事實不要重複寫進記憶。
+Cross-session user preferences / project context (things that can't be derived from the repo) go to the
+memory directory instead (in this environment: `~/.claude/projects/-Users-lans-h-Documents-claude-main/memory/`),
+one file per topic plus a one-line entry in the MEMORY.md index. Don't duplicate into memory anything the
+repo already records as fact.
 
-## 大小上限與精簡時機
+## Size caps and when to trim
 
-- CLAUDE.md 本體 ≤ 150 行，只當索引。超過 → 內容抽到引用檔，索引留一行。
-- CLAUDE.md 直接引用的常載檔合計 ≤ 500 行。
-- `meta/lessons.md` 超過 30 條 → 派 sonnet 合併精簡：重複主題合成一條規則；「過時」的判定要有證據（grep 該條目提到的檔名/符號在 src/ 為 0 hits 才可刪），精簡前先 git commit。
-- 任一 ops 檔超過 200 行 → 拆分或精簡（同樣先 git commit）。
+- CLAUDE.md itself stays ≤ 150 lines — it's an index only. Over that, pull content out into a referenced file and leave one line in the index.
+- The files CLAUDE.md directly references and expects to be loaded together stay ≤ 500 lines combined.
+- `meta/lessons.md` past 30 entries → dispatch to Sonnet to merge and trim:
+  - Fold repeated themes into a single rule.
+  - A "this is stale" determination needs evidence: grep the filenames/symbols the entry mentions and confirm 0 hits in `src/` before deleting it.
+  - Commit with git before trimming.
+- Any `ops/` file over 200 lines → split it or trim it (again, commit with git first).
 
-## 改檔安全規則
+## Safety rules for editing files
 
-- 改既有制度檔前先 git commit（留可回滾點；沒用 git 的專案先 `git init`）。新內容優先寫新檔。
-- 每完成一項就存檔再做下一項；session 隨時可能中斷，存了的才算數。
-- 改完 CLAUDE.md 或 ops 檔後，派 fresh-context haiku read-back 驗證（方法見 ops/judgment-rubrics.md#5）。
+- Commit with git before editing any existing operating-discipline file (leaves a rollback point; if the project isn't using git yet, `git init` first). New content should preferentially go into new files.
+- Save after finishing each item before starting the next one. A session can be interrupted at any time, and only what's saved counts.
+- After editing CLAUDE.md or any `ops/` file, dispatch a fresh-context Haiku to do a read-back verification (method in `ops/judgment-rubrics.md`#5).
 
-## 每季（或使用者說「檢查制度」時）的健檢清單
+## Quarterly health-check list (or whenever the user says "check the system")
 
-1. `ops/model-dispatch.md` 的型號清單還是現役的嗎？（查官方文件）
-2. CLAUDE.md 索引指的路徑全部存在嗎？（一行 shell 驗證所有路徑）
-3. meta/lessons.md 有沒有該規則化進 rubrics 的重複教訓？（有 → 問使用者要不要改 rubrics）
-4. 制度有沒有被實際遵守？抽查最近 session：派工有沒有帶三要素、驗證是不是 fresh-context。沒被遵守的規則要嘛太難用（回報使用者精簡）要嘛該加強（在 CLAUDE.md 索引提高可見度）。
+1. Is the model roster in `ops/model-dispatch.md` still current? (Check the official docs.)
+2. Do all the paths the CLAUDE.md index points to still exist? (One shell one-liner verifies every path.)
+3. Does `meta/lessons.md` have any repeated lesson that should get promoted into the rubrics? (If so, ask the user whether to update the rubrics.)
+4. Is the system actually being followed? Spot-check recent sessions: did delegation briefs carry the three required elements, was verification actually fresh-context. A rule that isn't being followed is either too cumbersome to use (report to the user, consider trimming it) or needs reinforcing (raise its visibility in the CLAUDE.md index).

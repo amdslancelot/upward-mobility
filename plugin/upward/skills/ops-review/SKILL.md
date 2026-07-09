@@ -1,72 +1,62 @@
 ---
 name: ops-review
-description: 審查任務怎麼派。要審查或驗證一批產出時用：四種審查類型（diff 正確性、過度工程、文件一致性、機械 read-back）各配什麼工具、haiku 驗形式 sonnet 驗語義的 model 選法、審查 prompt 的必要結構、收到 findings 後的處置義務。Use when about to dispatch a code or document review or verification.
+description: How to dispatch a review task. Use this when you're about to review or verify a batch of outputs — covers which of the four review types (diff correctness, over-engineering, document consistency, mechanical read-back) needs which tool, the model-selection rule (Haiku verifies form, Sonnet verifies meaning), the required structure of a review prompt, and your obligations once findings come back. Use when about to dispatch a code or document review or verification.
 ---
-# 審查任務怎麼派：類型、model、prompt 結構、findings 處置
+# How to dispatch a review task: types, models, prompt structure, findings triage
 
-> 讀者：主對話模型。回答「要審查一批產出時，該用哪種 agent、什麼 model、帶什麼 prompt、
-> 收到 findings 之後做什麼」。與 `ops-dispatch skill` 互補：那檔講該不該派，
-> 本檔講審查這類任務怎麼派。整合自 2026-07-06 Fable 5 session 實錄。
-> 完整的「計畫→執行→審查→修訂」任務迴圈骨架 → 來源 repo 的 WEAK-MODEL-PROMPT-GUIDE.md。
+> Audience: the main-conversation model. This answers "when reviewing a batch of outputs, which agent, which model, what prompt, and what to do once findings come back."
+> This complements `ops-dispatch skill`: that file covers whether to dispatch at all; this one covers how to dispatch review-shaped tasks specifically. Consolidated from the 2026-07-06 Fable 5 session transcript.
+> For the full plan → execute → review → revise task-loop skeleton, see the source repo's WEAK-MODEL-PROMPT-GUIDE.md.
 
-## 一、先分清審查的類型 — 工具跟著類型走
+## 1. Sort out the review type first — the tool follows the type
 
-「review」不是一種任務，是四種。選錯工具的審查會看起來有做、實際沒覆蓋到風險：
+"Review" isn't one task, it's four. Pick the wrong tool and the review looks done but doesn't actually cover the risk:
 
-| 審查類型 | 在審什麼 | 正確工具（本環境 2026-07-07；移植時重查） |
+| Review type | What it's checking | Correct tool (this environment, 2026-07-07; re-verify when you port this) |
 |---|---|---|
-| Diff/PR 正確性 | 這次改動有沒有 bug | `/code-review` skill 或 caveman:cavecrew-reviewer（吃 git diff） |
-| 過度工程 | 有沒有不該存在的抽象/依賴 | `/ponytail-review` skill（只獵複雜度；沒裝就用 general-purpose 帶焦點） |
-| 文件一致性 | 跨檔矛盾、佔位符、互引斷鏈、弱模型會誤讀的模糊句 | general-purpose agent + `ops-dispatch skill` #5 範本 |
-| 機械 read-back | 檔案存在？內容完整？句子沒斷？ | general-purpose agent，haiku 即可 |
+| Diff/PR correctness | Does this change have bugs | `/code-review` skill or caveman:cavecrew-reviewer (consumes a git diff) |
+| Over-engineering | Abstractions/dependencies that shouldn't exist | `/ponytail-review` skill (hunts complexity only; if not installed, use general-purpose with that focus) |
+| Document consistency | Cross-file contradictions, placeholders, broken cross-references, ambiguous sentences a weaker model would misread | general-purpose agent + `ops-dispatch skill` #5 template |
+| Mechanical read-back | Does the file exist? Is the content complete? Are sentences unbroken? | general-purpose agent, Haiku is enough |
 
-判準一句話：**審 diff 用 diff 工具，審內容用 general-purpose 帶自訂檢查面向**。專用工具的
-視角是硬編碼的，超出它視角的風險它一律沉默——沉默不等於沒問題。
+The rubric in one line: **use a diff tool to review a diff, use general-purpose with custom-defined checks to review content.** A specialized tool's field of view is hardcoded — any risk outside that view, it stays silent on. Silence isn't the same as "no problem."
 
-## 二、fresh-context 不是形式，是測試條件
+## 2. fresh-context isn't a formality, it's a test condition
 
-審查一律新開 agent（不 SendMessage 續用先前任何 agent），兩個理由：
+Reviews always spin up a new agent (never `SendMessage` to continue any prior agent), for two reasons:
 
-1. **驗證不自驗**：做事者（或看過做事過程的 agent）帶著作者視角，會腦補出文件裡
-   沒寫的脈絡，看不見歧義。
-2. **冷啟動本身就是模擬讀者**：制度檔與文件的目標讀者就是「不知道前情的弱模型」——
-   fresh-context agent 讀不懂的地方，未來 session 也讀不懂。它的困惑是數據，不是噪音。
+1. **Verification isn't self-verification**: whoever did the work (or any agent that watched the work happen) carries the author's point of view, and will mentally fill in context the document never actually states — so it can't see the ambiguity.
+2. **A cold start *is* the reader simulation**: the target reader for operating-rule files and docs is exactly "a weaker model with no prior context." Wherever a fresh-context agent gets confused, future sessions will get confused too. Its confusion is data, not noise.
 
-實例：某次審查抓到「README 寫五種範本、實際檔案有六種」——作者剛加了第六種，
-視角上「當然知道」，所以自己驗永遠驗不出這種 bug。
+Real example: one review caught "the README describes five templates, but there are actually six files" — the author had just added the sixth one, and from their point of view it was "obviously known," so self-review would never have caught that bug.
 
-## 三、model 選擇：haiku 驗形式，sonnet 驗語義
+## 3. Model selection: Haiku verifies form, Sonnet verifies meaning
 
-- **haiku**：checklist 可完全機械化時——檔案存在、行數、grep 某字串 0 hits、標題齊全。
-- **sonnet**：finding 需要推理時——「這句有兩種讀法」「這數字看似通用其實是專案殘留」
-  「這兩條規則邊界情況打架」。
-- **opus**：僅當審查對象本身是高風險判斷（架構決策、安全邊界）需要第二意見時。
+- **Haiku**: when the checklist can be fully mechanized — file exists, line count, a grep returns 0 hits, all headings present.
+- **Sonnet**: when a finding requires reasoning — "this sentence has two readings," "this number looks generic but is actually leftover project-specific cruft," "these two rules conflict in an edge case."
+- **Opus**: only when the thing under review is itself a high-stakes judgment call (architectural decisions, security boundaries) that needs a second opinion.
 
-選錯的代價不對稱：sonnet 審機械項多花約 1.5 倍，小虧；haiku 審語義項會回「全部 PASS」
-的假陰性，直接毀掉審查的意義。**不確定時往上選一級。**
+The cost of picking wrong is asymmetric: Sonnet reviewing mechanical items costs about 1.5x more — a minor loss. Haiku reviewing semantic items comes back with a false-negative "all PASS," which guts the entire point of the review. **When unsure, round up.**
 
-## 四、審查 prompt 的必要結構（抄 `ops-dispatch skill` #5 再加料）
+Good: "do rules 3 and 7 contradict each other in an edge case?" → Sonnet; it needs reasoning.
+Bad: sending "do rules 3 and 7 contradict?" to Haiku → it returns "all PASS," the contradiction ships, and the review bought you nothing.
 
-1. **明說審查員身份**：「你是 fresh-context 審查員，你的無知是資產」——遇到看不懂的
-   要回報而不是跳過。
-2. **檢查面向逐條列**，每條給可操作的起手式（例：「專案殘留：grep 這些詞：[詞表]」）——
-   面向不列，agent 只做它擅長的那種檢查。
-3. **給「規則本體 vs 範例脈絡」的判定標準**——不給，它會把合法範例報成 bug，
-   假陽性淹沒真 finding。
-4. **要求無發現的面向明說**：「檢查了 X/Y/Z，無發現」和「沒檢查」是兩回事。
-5. **要求模擬照做 N 條規則**（文件審查特有）：光讀不夠，卡住的地方才是可執行性 bug。
-6. **回報格式＋總長上限＋「不要改任何檔案」**——審查員只回報，修不修是指揮官的判斷。
+## 4. The required structure of a review prompt (start from `ops-dispatch skill` #5, then add this)
 
-## 五、收到 findings 之後的義務（與來源 repo 的 WEAK-MODEL-PROMPT-GUIDE.md 階段四同一套）
+1. **State the reviewer's identity explicitly**: "You are a fresh-context reviewer; your ignorance is an asset" — anything confusing should get reported, not skipped past.
+2. **List every check dimension explicitly**, each with an actionable starting move (e.g., "project-specific leftovers: grep for these terms: [list]") — if you don't list the dimensions, the agent only checks the kind it's naturally good at.
+3. **Give a rule for telling "the rule itself" apart from "example context"** — without it, the agent will report a legitimate example as a bug, and false positives will drown out the real findings.
+4. **Require it to state explicitly when a dimension has no findings**: "checked X/Y/Z, no findings" and "didn't check" are two different things.
+5. **Require it to simulate actually following N of the rules** (specific to document review): reading isn't enough — the places where it gets stuck are the actionable bugs.
+6. **Report format + total length cap + "don't modify any files"**: the reviewer only reports; whether to fix something is the commander's call.
 
-1. 逐條判斷採納或駁回——審查員有假陽性，全盤照收和全盤忽略一樣是失職。駁回附一句理由。
-2. 採納的 finding **回頭修改對應產出**，不是轉述給使用者就完事。
-3. 修完後輕量驗證（grep/wc 級別可以自己做——機械確認不算大量讀取，不必再派一輪）。
-4. 向使用者回報附數字：幾個 findings、幾高幾低、修了什麼、駁回了什麼——
-   「審查通過」四個字沒有資訊量。
+## 5. Obligations once findings come back (same playbook as phase four of the source repo's WEAK-MODEL-PROMPT-GUIDE.md)
 
-## 六、成本參考（2026-07 單次量測，換環境重量）
+1. Judge each finding individually — accept or reject. Reviewers produce false positives; accepting everything blindly is just as negligent as ignoring everything. Attach one reason when rejecting.
+2. Accepted findings get **applied back to the actual output** — relaying them to the user isn't the same as handling them.
+3. After fixing, do a lightweight verification (grep/`wc`-level checks are fine to do yourself — mechanical confirmation doesn't count as bulk reading, no need to dispatch another round for it).
+4. Report back to the user with numbers: how many findings, how many high/low severity, what got fixed, what got rejected — "review passed" carries zero information.
 
-語義審查約 35–40k subagent tokens、機械 read-back 約 25–27k。審查一批文件 ≈ 1.5–2 次
-一般派工——對「要長期沿用的產出」永遠值得；對單次性中間產物看情況省略
-（判準見來源 repo 的 WEAK-MODEL-PROMPT-GUIDE.md「什麼時候用」節）。
+## 6. Cost reference (single measurement from 2026-07, re-weigh for your environment)
+
+Semantic review runs about 35–40k subagent tokens; mechanical read-back runs about 25–27k. Reviewing a batch of documents costs roughly 1.5–2x a normal dispatch — always worth it for "output meant to stick around long-term"; for one-off intermediate artifacts, it's fine to skip depending on context (see the "when to use this" section of the source repo's WEAK-MODEL-PROMPT-GUIDE.md for the rubric).

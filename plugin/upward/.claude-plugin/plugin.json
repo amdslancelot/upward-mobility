@@ -4,6 +4,5 @@
   "description": "Operating discipline for delegating work to cheaper models: commander-doesn't-descend, verify-not-self-verify, model escalation ladder, rollback-before-reapproach. Always-on core injected via SessionStart hook; detailed rules loaded on demand as skills.",
   "author": {
     "name": "Lans Hung"
-  },
-  "hooks": "./hooks/hooks.json"
+  }
 }

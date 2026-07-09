@@ -1,47 +1,51 @@
-# project — CLAUDE.md（索引）
+# project — CLAUDE.md (index)
 
-Agent 運作制度包：把高階模型（Fable 5）的判斷外化成便宜模型（Haiku/Sonnet/Opus）能長期照做的規則。本目錄既是可攜模板（複製到其他專案用），也是一個以自身為根目錄的活專案。
+An agent operating-discipline pack. It externalizes senior-model (Fable 5) judgment into rules a cheaper model (Haiku/Sonnet/Opus) can follow for a long agent session without a human re-explaining anything. This directory is both a portable template (copy it into other projects) and a live project rooted in itself.
 
-**本檔只是索引。只讀你任務需要的那條指到的檔，不要為了「了解專案」整包掃目錄。**
+**This file is just an index. Read only the file your task points to — don't scan the whole directory just to "understand the project."**
 
-## Session 開始（照順序）
+## Start of session (in order)
 
-1. 讀本索引，找到任務相關的檔。
-2. 使用者第一次用這套制度 → 先讀 `USAGE.md`（workflow 與 prompt 方法）。
-3. 派工、升降級、驗證規則 → `ops/model-dispatch.md`。
-4. 交辦 prompt 直接抄範本 → `ops/prompt-templates.md`。
+1. Read this index, find the file relevant to your task.
+2. First time using this pack → read `USAGE.md` first (workflow and prompt method).
+3. Delegation, escalation, verification rules → `ops/model-dispatch.md`.
+4. Need a delegation prompt to copy → `ops/prompt-templates.md`.
 
-## 核心三規則（其餘見各檔）
+## Three core rules (details in each file)
 
-- **指揮官不下場**：大量讀取/掃描/批次改檔/驗證一律派 subagent，主對話只收結論。
-- **驗證不自驗**：完成宣稱必須有執行證據（build/測試/實跑/read-back），驗證派新開的 general-purpose agent（不續用做事者）。
-- **卡住的判準查表**：何時升級模型、何時算完成、何時問使用者、何時換路 → `ops/judgment-rubrics.md`。
+- **The commander doesn't descend.** Bulk reading, scanning, batch edits, and verification always get delegated to a subagent. The main thread only receives conclusions.
+- **Verification isn't self-verification.** A completion claim needs execution evidence: build, test, actual run, or read-back. Verification goes to a freshly-spawned general-purpose agent, never the one that did the work.
+- **The stuck-point rubric.** When to escalate the model, when something actually counts as done, when to ask the user, when to change approach → `ops/judgment-rubrics.md`.
 
-## 檔案地圖（2026-07-07 查證）
+## File map (verified 2026-07-07)
 
-| 檔案 | 內容 | 什麼時候讀 |
+| File | Contents | When to read it |
 |---|---|---|
-| `USAGE.md` | 使用者操作手冊：workflow、怎麼下 prompt、模型額度分配 | 使用者問「怎麼用」、session 規劃時 |
-| `WEAK-MODEL-PROMPT-GUIDE.md` | 計畫→執行→審查→修訂迴圈的 prompt 骨架＋照做一次的教學範例（使用者手動驅動版；模型自套版是 `ops/plan-lifecycle.md`，改一份順手檢查另一份） | 交辦多產出大任務、要求品質迴圈時 |
-| `ops/model-dispatch.md` | 派工對照表、交辦三要素、升降級路徑、驗證不自驗 | 每次派工前 |
-| `ops/prompt-templates.md` | 六種交辦範本（搜尋/實作/重構/研究/審查/追加） | 每次派工時抄 |
-| `ops/judgment-rubrics.md` | 六組判斷 checklist，每條一正一反例 | 卡住、不確定完成、想升級時 |
-| `ops/review-dispatch.md` | 審查怎麼派：四類型、model 選擇、prompt 六要素、findings 處置 | 要派審查/驗證前 |
-| `ops/plan-lifecycle.md` | 大任務生命週期（brief→計畫→執行→審查→修訂）模型自套版＋plan.md 模板（brief 折進開頭） | 開始多產出／半天以上大任務時 |
-| `ops/harness-diagnosis.md` | 此 harness 的 token 漏洞與修法 | session 失焦、context 爆炸時 |
-| `meta/maintenance.md` | 誰能改什麼、教訓寫回 `meta/lessons.md`、精簡門檻 | 想改制度檔、踩雷後 |
-| `meta/letter-template.md` | 交接信骨架 | 重大 session 結束時照它寫 |
-| `meta/letter-to-future-sessions.md` | 交接信本體（含最低信心產出清單） | 接手前人工作、想知道哪些數字沒實測時 |
-| `meta/AUDIT-2026-07-07.md` | Fable 5 對本制度的審計：能替代到什麼程度、殘餘缺口 | 想知道制度極限、規劃改進時 |
-| `meta/CLAUDE.template.md` | 索引骨架（移植到其他專案時用，本專案不讀它） | 只在移植時 |
-| `README.md` | 包的內容清單與移植步驟 | 只在移植時 |
+| `USAGE.md` | User's operating manual: workflow, how to write prompts, model budget allocation | When the user asks "how do I use this," or when planning a session |
+| `WEAK-MODEL-PROMPT-GUIDE.md` | The plan→execute→review→revise loop's prompt skeleton, plus a worked teaching example (the user-driven, manually-prompted version; the model-self-driven version is `ops/plan-lifecycle.md` — edit one, check the other) | Delegating a large multi-output task, demanding a quality loop |
+| `ops/model-dispatch.md` | Delegation reference table, the three required elements of a delegation brief, escalation ladder, verification isn't self-verification | Before every delegation |
+| `ops/prompt-templates.md` | Six delegation templates (search / implement / refactor / research / review / follow-up) | Copy from it every time you delegate |
+| `ops/judgment-rubrics.md` | Six judgment checklists, each with one good example and one bad example | When stuck, unsure if something's done, considering escalation |
+| `ops/review-dispatch.md` | How to delegate a review: four review types, model choice, the six elements a review prompt needs, how to handle findings | Before delegating any review/verification |
+| `ops/plan-lifecycle.md` | Large-task lifecycle (brief→plan→execute→review→revise), the model-self-driven version, plus a plan.md template (brief folded into the opening) | Starting a multi-output task or one that'll take half a day or more |
+| `ops/harness-diagnosis.md` | This harness's token leaks and how to fix them | Session loses focus, context balloons |
+| `meta/maintenance.md` | Who can change what, where lessons get written back to (`meta/lessons.md`), the threshold for trimming | Want to change an operating-discipline file, or just got burned |
+| `meta/letter-template.md` | Handoff-letter skeleton | Write one following this skeleton at the end of any major session |
+| `meta/letter-to-future-sessions.md` | The actual handoff letter (includes a list of lowest-confidence outputs) | Taking over someone else's work, want to know which numbers are unverified |
+| `meta/AUDIT-2026-07-07.md` | Fable 5's audit of this pack: how far it substitutes for senior-model judgment, and remaining gaps | Want to know this pack's limits, planning improvements |
+| `meta/CLAUDE.template.md` | Index skeleton (for porting to other projects — this project doesn't read it) | Only when porting |
+| `README.md` | Contents list and porting steps for this pack | Only when porting |
 
-重要的「沒有」：本專案無程式碼、無測試、無 build。產物全是 markdown；品質驗證 = fresh-context read-back 與對抗審查（`ops/judgment-rubrics.md`#5）。
+An important "does NOT have": this project has no code, no tests, no build. Every output is markdown. Quality verification means fresh-context read-back and adversarial review (`ops/judgment-rubrics.md`#5).
 
-## 硬規則
+## Hard rules
 
-- 寫進檔案的內容（docs/commit）一律完整句子正常寫；壓縮口吻只用於對話。
-- 改制度檔前先 git commit（留可回滾點；沒用 git 的專案先 `git init`）；新內容寫新檔；本索引 ≤150 行。
-- 目錄約定：根目錄只放使用者直接抄用的入口檔（本檔、USAGE、README、WEAK-MODEL-PROMPT-GUIDE）；工作規則進 `ops/`；制度治理與歷史進 `meta/`。所有檔內路徑一律寫「相對專案根」（例：`ops/model-dispatch.md`），不寫相對自身的 `../`。
-- 型號/參數/價格永遠先查證再寫，查不到標 UNVERIFIED，不編造。
-- `ops/judgment-rubrics.md` 的規則本體、`.claude/` 設定：動之前先問使用者（詳見 `meta/maintenance.md` 權限分級）。
+- Anything written into a file (docs/commit) is always full, normal sentences. Compressed phrasing is for conversation only.
+- Commit with git before editing any operating-discipline file, so there's a rollback point (if the project isn't using git yet, `git init` first). New content goes in new files. This index stays ≤150 lines.
+- Directory convention:
+  - Root directory holds only the entry files the user copies directly (this file, USAGE, README, WEAK-MODEL-PROMPT-GUIDE).
+  - Working rules go in `ops/`.
+  - Governance and history go in `meta/`.
+  - Every path referenced inside any file is written relative to the project root (e.g. `ops/model-dispatch.md`), never relative to itself with `../`.
+- Model names/parameters/prices always get verified before being written down. Can't verify it? Mark it UNVERIFIED — never make it up.
+- Ask the user before touching either of these: the rule bodies in `ops/judgment-rubrics.md`, or the `.claude/` settings. See the permission tiers in `meta/maintenance.md`.

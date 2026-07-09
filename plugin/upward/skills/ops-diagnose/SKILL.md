@@ -1,72 +1,75 @@
 ---
 name: ops-diagnose
-description: 環境診斷與 context 管理。session 失焦、context 爆炸、或修不好疑似環境問題時用：最漏 token 的行為模式與修法、/compact 與 /clear 判準、以及修法該生效卻沒生效時把搜索範圍擴到環境/依賴/更早步驟的排查清單與證據閘。Use when the session loses focus, context bloats, or a fix that should work does not take effect.
+description: Environment diagnosis and context management. Use this when a session loses focus, context blows up, or a fix seems like it should work but the environment itself is suspect — covers the behavior patterns that leak the most tokens and how to fix them, the criteria for /compact vs /clear, and the checklist for widening your search to environment/dependencies/earlier steps plus the evidence gate that stops you from blaming the environment too fast. Use when the session loses focus, context bloats, or a fix that should work does not take effect.
 ---
-# 環境診斷：此 harness 最漏 token / 最易失焦 / 最易出錯的地方
+# Environment diagnosis: where this harness leaks the most tokens, loses focus fastest, and breaks most often
 
-> 讀者：接手本專案的較小模型。每條附「照做即可」的修法。
-> 陷阱 1–5 是跨環境通用的；標「環境特定」的段落已按本環境（2026-07-07）填實，移植到其他專案時要重新診斷改寫。
+> Audience: the smaller model inheriting this project. Every rule ships with a "just do this" fix.
+> Traps 1–5 are portable across environments; sections marked "environment-specific" are already filled in for this environment (as of 2026-07-07) — rediagnose and rewrite them when you move this to another project.
 
-## 0. 採用模板時：重新診斷你的環境（做一次）
+## 0. Adopting this template? Rediagnose your environment first (do this once)
 
-換了專案或 harness 設定，陷阱清單可能不同。診斷步驟：
+Change projects or harness config, and the trap list may no longer match. Diagnosis steps:
 
-1. 看 session 開場注入了什麼：有哪些 plugin hook？常駐注入多少 token？（讀 session log 的第一筆 API 呼叫可見）
-2. 檢查 CLAUDE.md 是否存在且是索引式的 — 不存在就是第一大漏，先建。
-3. 跑幾個典型任務，觀察主對話有沒有直接吞大檔、長 log — 有就是陷阱 3。
-4. 把診斷結果改寫進本檔標「本環境」的段落，刪掉不適用的部分。
+1. Check what gets injected at session start — which plugin hooks are active, how many tokens they burn as standing overhead. (Visible in the first API call of the session log.)
+2. Check whether CLAUDE.md exists and is index-style. If it doesn't exist, that's leak #1 — build it now.
+3. Run a few typical tasks and watch whether the main conversation swallows large files or long logs directly. If it does, that's trap 3.
+4. Rewrite the findings into this file's "this environment" sections, and delete whatever no longer applies.
 
-## 1. 沒有（或腐化的）CLAUDE.md → 每個 session 重新掃 repo（最大漏洞）
+## 1. Missing (or rotted) CLAUDE.md → every session re-scans the repo from scratch (the biggest leak)
 
-**症狀**：每個新 session 重新 ls、讀設定檔、grep 找核心邏輯 — 每次燒上萬 token 重建同樣的認知，而且弱模型重建品質更差（會漏掉非顯名檔案）。
+**Symptom**: every new session re-`ls`'s, re-reads config files, re-greps for core logic — burning tens of thousands of tokens to rebuild the same mental model each time, and a weaker model rebuilds it worse (it misses files with non-obvious names).
 
-**修法（照做）**：
-1. Session 開始先讀 CLAUDE.md 索引，**只讀任務需要的那條指到的檔**。
-2. 不要為了「了解專案」整包掃 src/。索引沒涵蓋 → 派搜尋型 subagent。
-3. 學到索引沒有的重要事實 → 按來源 repo 的 meta/maintenance.md 把它加進索引（一行）。
+**Fix (just do this)**:
+1. At session start, read the CLAUDE.md index first, and **only read the file the current task's entry points to**.
+2. Don't scan all of `src/` just to "understand the project." If the index doesn't cover it, dispatch a search-type subagent instead.
+3. Learn an important fact the index doesn't have? Add it as one line to the index, per the source repo's `meta/maintenance.md`.
 
-## 2. 常駐 plugin/hook 的噪音與模式打架（環境特定段——移植時重新診斷改寫）
+## 2. Standing plugins/hooks clashing in noise and mode (environment-specific — rediagnose and rewrite when you port this)
 
-**症狀**（本環境，2026-07-07）：caveman（極簡口吻）+ ponytail（最懶實作）兩個常駐 plugin，每 session 注入約 2k token；弱模型會把「省字」滲進不該省的地方（文件、commit、安全警告），把「最短 diff」誤讀成「跳過理解直接改」。
+**Symptom** (this environment, as of 2026-07-07): two standing plugins — caveman (terse-speech mode) and ponytail (laziest-implementation mode) — inject roughly 2k tokens per session. Weaker models let "save words" bleed into places it shouldn't (docs, commits, security warnings), and misread "shortest diff" as "skip understanding, edit immediately."
 
-**修法（照做）**：
-1. 口吻壓縮只用在對話回覆。判準：這段字會不會存進 repo？會 → 完整句子正常寫。
-2. 動手改 code 前，先讀完「這個改動會碰到的每個檔」再選最小方案。做到一半發現要碰的檔案數比估計多一倍以上 → 停，重讀範圍、更新估計再繼續；仍超出就按 `ops-judge skill`#4 換路或升級。
-3. 使用者要求關閉某模式時立即照辦，不要幾輪後滑回去。
+**Fix (just do this)**:
+1. Speech compression only applies to conversational replies. The test: does this text get saved into the repo? If yes, write full sentences normally.
+2. Before touching code, read every file the change will touch, *then* pick the minimal approach. If partway through you find the file count is more than double your estimate, stop, re-read the scope, update the estimate, and only then continue. Still over? Change course or escalate per `ops-judge skill` #4.
+3. When the user asks you to turn a mode off, do it immediately — don't drift back to it a few turns later.
 
-## 3. 主對話自己下場做大量讀取／執行（最漏 token 的行為模式）
+## 3. The main conversation doing bulk reads/execution itself (the behavior pattern that leaks the most tokens)
 
-**症狀**：主對話直接讀大檔、連續 grep、吞長 build log — 原始輸出全部進主 context，一次大掃描吃掉 context 的 1/4，後面的判斷品質跟著掉。
+**Symptom**: the main conversation reads large files directly, chains greps, swallows long build logs — all that raw output lands in main context, one big scan eats a quarter of the context window, and judgment quality degrades from there on.
 
-**修法（照做）**：
-1. 「要讀 3 個或更多檔案（≥3）才能回答」或「輸出會超過 100 行」的偵查工作 → 派 subagent（見 `ops-dispatch skill`），主對話只收結論 + `檔案:行號`。此門檻與 `ops-dispatch skill` 的「≥3–4 輪 tool call」是同一判準的兩種表述；邊界情況以輪次為準。
-2. 跑測試/build：長輸出管進檔案（`... > /tmp/build.log 2>&1`），只讀最後 30 行或 grep error。
-3. 進 context 的每段文字問一次：這是「結論」還是「原料」？原料不進主對話。
+**Fix (just do this)**:
+1. Any reconnaissance work that needs "3 or more files (≥3) to answer" or "output over 100 lines" gets dispatched to a subagent (see `ops-dispatch skill`); the main conversation only receives the conclusion plus `file:line`. This threshold and `ops-dispatch skill`'s "≥3–4 rounds of tool calls" are two phrasings of the same rubric — when in doubt, go by round count.
+2. Running tests/builds: pipe long output to a file (`... > /tmp/build.log 2>&1`), then only read the last 30 lines or grep for `error`.
+3. For every chunk of text about to enter context, ask: is this a **conclusion** or **raw material**? Raw material doesn't belong in the main conversation.
 
-## 4. Context 複利與 /compact、/clear 判準
+## 4. Context compounds — the criteria for /compact and /clear
 
-**機制一句話**：API 無狀態，整場對話每輪重送；每個進入主 context 的 token，session 剩餘每一輪都要重付一次（cache 折價但不免費）。
+**The mechanism, in one line**: the API is stateless, so the whole conversation gets resent every turn; every token that enters main context gets paid again on every remaining turn of the session (caching discounts it, but it's never free).
 
-**修法（照做）**：
-1. 任務交付完、下一件事**相關** → 確認結論已存檔，再建議使用者 `/compact 保留檔案路徑、行號、未完成事項`。
-2. 下一件事**不相關** → 建議 `/clear`（新 session 從 CLAUDE.md 索引重建，比 compact 便宜且不失真）。
-3. 不要在任務進行中 compact。
-4. 這兩個指令由使用者輸入；你的義務是在任務邊界主動提醒，並確保存檔先於壓縮。
+**Fix (just do this)**:
+1. Task delivered, next task is **related** → confirm conclusions are already saved to file, then suggest the user run `/compact` keeping file paths, line numbers, and open items.
+2. Next task is **unrelated** → suggest `/clear` (a fresh session rebuilds from the CLAUDE.md index, which is cheaper than compacting and doesn't distort anything).
+3. Don't compact mid-task.
+4. These two commands are typed by the user — your job is to proactively remind them at task boundaries, and make sure saving to file happens before compacting.
 
-## 5. 修不好時：把搜索範圍擴到環境／依賴（別只盯失敗的那行）
+## 5. When a fix won't take: widen the search to environment/dependencies (don't just stare at the failing line)
 
-**症狀**：同一個修法該生效卻沒生效，或錯誤堆疊指向你從沒改過的檔／層。弱模型的預設是死盯報錯那行反覆改，但根因可能在環境、依賴或更早的步驟——這類根因 **model 升級治不了**（opus 面對壞掉的依賴一樣失敗），死盯只會把兩輪重試額度燒在贏不了的仗上。
+**Symptom**: the same fix should work but doesn't, or the error stack points at a file/layer you've never touched. A weaker model's default is to stare at the reported line and keep tweaking it, but the root cause can live in the environment, a dependency, or an earlier step — and this class of root cause **cannot be fixed by escalating the model** (Opus fails the same way against a broken dependency). Staring at it just burns your two retry rounds on a fight you can't win.
 
-**排查清單（症狀頑固時依序查）**：
-1. 版本：lockfile vs 實際安裝、runtime／語言版本是否與假設一致。
-2. 陳舊產物：build cache、`node_modules`／`__pycache__`、舊編譯輸出沒清乾淨。
-3. config／env：環境變數、設定檔與假設不符。
-4. 乾淨重現：clean clone／全新安裝一次還會不會重現？（隔離「我的狀態」vs「程式本身」）
-5. 錯誤來源層：堆疊指向你從沒改過的檔 → 根因在上游（更早步驟或依賴，回到 `ops-judge skill`#4 的 regression 支處理）。
+**Checklist (work through in order when the symptom won't budge)**:
+1. Versions: lockfile vs. what's actually installed; does the runtime/language version match your assumptions?
+2. Stale artifacts: build cache, `node_modules`/`__pycache__`, old compiled output not cleaned up.
+3. Config/env: environment variables and config files not matching your assumptions.
+4. Clean reproduction: does it still reproduce from a clean clone / fresh install? (Isolates "my local state" from "the program itself.")
+5. Which layer the error originates from: stack points at a file you've never touched → the root cause is upstream (an earlier step or a dependency — go back to the regression branch of `ops-judge skill` #4).
 
-**證據閘（防濫用）**：「怪環境」是最好用的逃避——十次有九次其實是自己的 bug。接受環境／依賴假設前**先拿出實證**：一個對不上的版本號、一個 clean-clone 能重現的結果。光是懷疑不算；預設立場維持「是我的改動」，直到環境假設有實證支撐。
+**Evidence gate (to stop abuse)**: "blame the environment" is the easiest excuse there is — nine times out of ten it's actually your own bug. Before accepting an environment/dependency hypothesis, **produce evidence first**: a version number that doesn't match, or a result that reproduces from a clean clone. Suspicion alone doesn't count; the default assumption stays "it's my change" until the environment hypothesis has evidence behind it.
 
-## 次要（不到前四，但記一下）
+Good: `node -v` prints 18, but the lockfile pins a package that needs 20 → concrete mismatch, environment hypothesis earns its place.
+Bad: "the test is flaky, probably a caching thing" with nothing measured → that's a guess, not evidence; keep assuming it's your change.
 
-- 長 session 的 context 壓縮會丟細節：重要中間結論**隨做隨寫進檔案**。
-- 記憶目錄（本環境：`~/.claude/projects/-Users-lans-h-Documents-claude-main/memory/`；移植時換成 `~/.claude/projects/<專案>/memory/`）跨 session 載入索引 — 跨 session 事實寫那裡，單 session 事實不要寫。
+## Minor (below the top four, but worth noting)
+
+- Long-session context compaction drops detail: write important intermediate conclusions to file **as you go**, not after.
+- The memory directory (this environment: `~/.claude/projects/-Users-lans-h-Documents-claude-main/memory/`; swap in `~/.claude/projects/<project>/memory/` when you port this) loads its index across sessions — cross-session facts belong there; single-session facts don't.

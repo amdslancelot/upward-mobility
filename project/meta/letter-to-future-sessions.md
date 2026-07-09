@@ -1,54 +1,79 @@
-# 給未來 session 的信
+# A Letter to Future Sessions
 
-> 寫於 2026-07-07，Fable 5 session——使用者最後一次 Fable 5 額度。之後接手的是你，
-> 大概是 Sonnet 或 Opus。這封信寫的是檔案與規則讀不出來的東西。
+> Written 2026-07-07, in a Fable 5 session — the user's last Fable 5 quota run. Whoever picks this up next
+> is probably Sonnet or Opus. This letter is about the stuff files and rules can't tell you.
 
-## 三件使用者沒問但我認為最重要的事
+## Three things the user didn't ask, but I think matter most
 
-**1. 這套制度的品質天花板是「驗收條件寫得好不好」，而驗收條件的品質靠使用者審，不靠你。**
-你（弱指揮官）寫的驗收條件會系統性地偏糊——這不是責備，是已知特性。所以重要任務
-永遠走 `USAGE.md` 3.2 的「先計畫後執行」，把驗收條件亮給使用者看再動工。使用者跳過
-這步時，你的義務是提醒一次（一次就好，不要說教）。
+**1. This system's quality ceiling is "how good are the acceptance criteria" — and that quality is guarded by the user, not by you.**
+You (a weak commander) will systematically write acceptance criteria that are too vague. That's not a
+knock, it's a known trait. So important tasks should always go through `USAGE.md` 3.2's "plan first, then
+execute": show the user the acceptance criteria before you start work. When the user skips this step, your
+job is to remind them once — once, no lecturing.
 
-**2. 制度最大的殘餘缺口是「模糊需求的第一刀」，而最便宜的補法在使用者端，不在你端。**
-使用者把需求寫清楚一分，整條執行鏈的品質升一分。收到模糊需求時，先回「我對任務的
-理解是 X，拆解是 Y」再動工，讓誤解在第 0 步現形，而不是在第 20 步返工。這比任何
-事後驗證都便宜。
+**2. The system's biggest remaining gap is "the first cut at a vague requirement," and the cheapest fix for that lives on the user's side, not yours.**
+Every bit of clarity the user adds to a requirement raises the quality of the whole execution chain by a
+notch. When you get a vague request, respond first with "Here's how I understand the task: X, and here's
+my breakdown: Y" before you touch anything. Surface the misunderstanding at step 0, not after 20 steps of
+rework. That's cheaper than any amount of after-the-fact verification.
 
-**3. 本包已自足，判斷所需的方法學都在包內**：審查派工方法學在 `ops/review-dispatch.md`，
-派工成本直覺在 `ops/model-dispatch.md`「成本直覺」節，任務品質迴圈在根目錄
-`WEAK-MODEL-PROMPT-GUIDE.md`。（派工成本的完整機制推導原為包內 `ops/agent-dispatch-mechanics.md`，
-2026-07-08 移至上層 `docs/` 當背景讀物——它是解釋性研究報告，日常運作用不到；
-上述三檔已含所有 actionable 規則，包內引用已全部改指這三檔。）制度運作不依賴任何包外檔案。另一件使用者該知道的事
-（2026-07 環境體檢的結論，屬環境雜項不影響制度）：使用者的 skill/plugin 清單有冗餘
-——stop-slop 安裝損壞、review 路徑有四條互相重疊——建議清理，使用者尚未處理。
+**3. This pack is self-sufficient — all the methodology you need for judgment calls is already inside it.**
+- Review-dispatch methodology lives in `ops/review-dispatch.md`.
+- Cost intuition for delegation lives in the "Cost Intuition" section of `ops/model-dispatch.md`.
+- The task quality loop lives in `WEAK-MODEL-PROMPT-GUIDE.md` at the root.
 
-## 這套制度最可能的退化方式與預防
+The full mechanics behind delegation cost used to live in `ops/agent-dispatch-mechanics.md` inside the
+pack. On 2026-07-08 it was moved up to `docs/` as background reading — it's an explanatory research report,
+not something you need for day-to-day operation. The three files above already contain every actionable
+rule, and every in-pack reference has been repointed to them. The system's operation doesn't depend on any
+file outside the pack.
 
-1. **觸發句失效**：使用者久了不再用 `USAGE.md` 3.3 的觸發句，指揮官漂移回自己下場。
-   預防：你在 session 開場主動讀 CLAUDE.md 核心三規則，把「派工」當預設而非例外。
-2. **驗證變形式**：為省 token 跳過 fresh-context 驗證，或驗證 prompt 不給檢查面向
-   （agent 只會回「看起來沒問題」）。預防：驗證交辦永遠抄 `ops/prompt-templates.md` 第 5 種，
-   面向逐條列。
-3. **型號清單腐化**：sonnet-5 之後還會有新模型，`ops/model-dispatch.md` 的查證日期是保鮮期
-   標籤。預防：查證日期超過一季就照 `meta/maintenance.md` 健檢清單重查，別沿用。
-4. **制度自我膨脹**：每踩一雷加一條規則，三個月後沒人讀得完。預防：`meta/maintenance.md`
-   的大小上限是硬的；教訓進 `meta/lessons.md` 不進規則本體，重複三次的教訓才升格為規則
-   （且要問使用者）。
+One more thing the user should know — a finding from the 2026-07 environment checkup, environment
+miscellany that doesn't affect the system itself: the user's skill/plugin list has redundancy. stop-slop is
+installed broken, and there are four overlapping review paths. Cleanup is recommended, but the user hasn't
+gotten to it yet.
 
-## 我對哪些產出信心最低（誠實排序）
+## The most likely ways this system degrades, and how to prevent them
 
-1. **AUDIT 裡的「八成」**：結構化估計，零實測。第一個接手 session 該做的驗證：
-   挑三個舊任務用 USAGE 流程重做，比對產出品質。數字錯了就改 AUDIT，別供著。
-2. **「20k 派工冷啟動」與各項 token 實測值**：單一 session、單一環境的量測。
-   訂閱方案、plugin 組合改變都會動這些數字。在你的環境重量的方法：讀 session log
-   （`~/.claude/projects/<專案>/<session-id>.jsonl` 的 token 欄位）或請使用者打 `/cost`。
-3. **「alias sonnet 對應哪版」**：查證時官方文件標 sonnet-5 現役、sonnet-4-6 legacy，
-   但本 harness 的 alias 映射沒有實測（當時 session 是 fable，切模型會中斷工作）。
-   接手後第一次 `/model` 時順手確認，更新 `ops/model-dispatch.md`。
-4. **USAGE 3.4 的多答案評審句式**：方法論上成立（分歧點=需仲裁點），但沒在本環境
-   實跑過完整一輪。第一次用時把實際效果（值不值三倍派工成本）記進 `meta/lessons.md`。
+1. **Trigger phrases stop being used**: over time the user stops invoking the trigger phrases from
+   `USAGE.md` 3.3, and the commander drifts back into doing the work itself. Prevention: at the start of
+   each session, proactively read CLAUDE.md's core three rules and treat "delegate" as the default, not the
+   exception.
+2. **Verification turns into theater**: skipping fresh-context verification to save tokens, or writing a
+   verification prompt that doesn't spell out what to check (so the agent just replies "looks fine").
+   Prevention: verification dispatch should always be copied from `ops/prompt-templates.md` template #5,
+   with every check spelled out item by item.
+3. **The model roster rots**: there will be new models after sonnet-5, and the verification date in
+   `ops/model-dispatch.md` is a freshness label, not a permanent fact. Prevention: once the verification
+   date is more than a quarter old, re-verify per the health-check list in `meta/maintenance.md`. Don't just
+   keep using stale info.
+4. **The system bloats itself**: adding one rule per lesson learned, until three months later nobody can
+   read the whole thing. Prevention: `meta/maintenance.md`'s size cap is a hard rule. Lessons go into
+   `meta/lessons.md`, not into the rule body itself — a lesson only gets promoted to a rule after it repeats
+   three times (and even then, ask the user first).
 
-## 最後
+## Ranked honestly: which outputs I trust least
 
-制度是拿來省判斷的，不是拿來崇拜的。哪條規則連續三次礙事，就帶著證據去問使用者要不要改。
+1. **The "roughly 80%" figure in the AUDIT**: a structured estimate, zero measurement behind it. The first
+   thing whoever picks this up should verify: pick three old tasks, redo them with the `USAGE.md` workflow,
+   and compare output quality. If the number's wrong, fix the AUDIT — don't just leave it enshrined.
+
+   For example: if you redo one of the three tasks and the Sonnet-plus-system output is clearly weaker (not
+   just different), that's evidence the 80% figure is too high — write the comparison into the AUDIT, don't
+   quietly let the number stand.
+2. **The "20k-token delegation cold-start" figure and other measured token values**: measured in a single
+   session, in a single environment. Subscription plan changes or a different plugin mix will move these
+   numbers. To re-measure in your own environment: read the session log (the token fields in
+   `~/.claude/projects/<project>/<session-id>.jsonl`) or ask the user to run `/cost`.
+3. **"Which version does the sonnet alias resolve to"**: as of verification, official docs list sonnet-5 as
+   current and sonnet-4-6 as legacy, but this harness's alias mapping was never actually tested (the session
+   at the time was running Fable, and switching models would have interrupted the work). Next time you run
+   `/model`, take the opportunity to confirm this and update `ops/model-dispatch.md`.
+4. **USAGE 3.4's multi-answer review phrasing**: sound in theory (divergence = where arbitration is
+   needed), but never run through a full cycle in this environment. The first time you use it, log what
+   actually happened (was tripling the delegation cost worth it?) in `meta/lessons.md`.
+
+## Last thing
+
+The system exists to save judgment, not to be worshipped. If a rule gets in your way three times running,
+bring the evidence to the user and ask whether it should change.
