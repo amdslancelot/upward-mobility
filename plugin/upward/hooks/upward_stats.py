@@ -83,7 +83,15 @@ def parse_transcript(path):
                 content = d.get("message", {}).get("content")
                 label = None
                 if isinstance(content, str):
-                    label = " ".join(content.strip().split())[:70]
+                    cmd_m = re.search(r"<command-name>([^<]*)</command-name>", content)
+                    if cmd_m:
+                        label = cmd_m.group(1).strip()
+                        args_m = re.search(r"<command-args>([^<]*)</command-args>", content)
+                        if args_m and args_m.group(1).strip():
+                            label += " " + args_m.group(1).strip()
+                        label = label[:70]
+                    else:
+                        label = " ".join(content.strip().split())[:70]
                 if pid not in tasks:
                     tasks[pid] = {"label": label, "calls": [], "ts": d.get("timestamp")}
                     order.append(pid)
