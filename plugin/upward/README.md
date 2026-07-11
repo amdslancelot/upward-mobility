@@ -39,14 +39,16 @@ plugin/upward/
 ├── .claude-plugin/plugin.json   # plugin manifest
 ├── core.md                      # always-on rules, injected by the SessionStart hook
 ├── hooks/
-│   ├── hooks.json                # registers the SessionStart hook
-│   └── activate.sh               # cats core.md to stdout on session start/resume/clear/compact
+│   ├── hooks.json                # registers the SessionStart and Stop hooks
+│   ├── activate.sh               # cats core.md to stdout on session start/resume/clear/compact
+│   └── upward_stats.py           # Stop hook: writes UPWARD-STATS.md when upward-stats is on
 └── skills/
     ├── upward-ops-plan/       # brief → plan.md → execute → review → revise loop for large tasks
     ├── upward-ops-dispatch/   # how to pick agent type/model, delegation prompt templates, escalation ladder
     ├── upward-ops-review/     # which review type needs which tool/model, findings triage
     ├── upward-ops-judge/       # rubric: when to escalate, when a task is actually done, when to change course
-    └── upward-ops-diagnose/   # context bloat and environment-diagnosis playbook
+    ├── upward-ops-diagnose/   # context bloat and environment-diagnosis playbook
+    └── upward-stats/           # /upward-stats on|off|level task|level call — per-prompt/per-call token usage log
 ```
 
 ## How it loads
@@ -54,6 +56,8 @@ plugin/upward/
 The `SessionStart` hook (matches `startup`, `resume`, `clear`, `compact`) runs `activate.sh`, which prints `core.md` to stdout. Claude Code injects that stdout into the session as context — so the core rules are present from the very first turn, in every new or resumed session.
 
 The five `upward-ops-*` skills are **not** injected automatically. The core rules tell the model which skill to invoke via the Skill tool for a given situation (e.g. "starting a multi-step task" → `upward-ops-plan`), so the detailed playbook only enters context when it's actually needed.
+
+`upward-stats` is a standalone toggle, unrelated to the always-on core rules: `/upward-stats on` writes `.upward-stats-state.json` at the project root, and the plugin's `Stop` hook checks that file after every turn, rewriting `UPWARD-STATS.md` with token usage grouped by prompt (and by individual API call, including model, at `level call`). `/upward-stats off` turns it back off. Both `UPWARD-STATS.md` and `.upward-stats-state.json` are generated/local — add them to your project's `.gitignore` if you don't want them tracked.
 
 ## Notes for adapting this to another project
 
