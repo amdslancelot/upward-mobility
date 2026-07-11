@@ -1,5 +1,5 @@
 ---
-name: ops-diagnose
+name: upward-ops-diagnose
 description: Environment diagnosis and context management. Use this when a session loses focus, context blows up, or a fix seems like it should work but the environment itself is suspect — covers the behavior patterns that leak the most tokens and how to fix them, the criteria for /compact vs /clear, and the checklist for widening your search to environment/dependencies/earlier steps plus the evidence gate that stops you from blaming the environment too fast. Use when the session loses focus, context bloats, or a fix that should work does not take effect.
 ---
 # Environment diagnosis: where this harness leaks the most tokens, loses focus fastest, and breaks most often
@@ -31,7 +31,7 @@ Change projects or harness config, and the trap list may no longer match. Diagno
 
 **Fix (just do this)**:
 1. Speech compression only applies to conversational replies. The test: does this text get saved into the repo? If yes, write full sentences normally.
-2. Before touching code, read every file the change will touch, *then* pick the minimal approach. If partway through you find the file count is more than double your estimate, stop, re-read the scope, update the estimate, and only then continue. Still over? Change course or escalate per `ops-judge skill` #4.
+2. Before touching code, read every file the change will touch, *then* pick the minimal approach. If partway through you find the file count is more than double your estimate, stop, re-read the scope, update the estimate, and only then continue. Still over? Change course or escalate per `upward-ops-judge skill` #4.
 3. When the user asks you to turn a mode off, do it immediately — don't drift back to it a few turns later.
 
 ## 3. The main conversation doing bulk reads/execution itself (the behavior pattern that leaks the most tokens)
@@ -39,7 +39,7 @@ Change projects or harness config, and the trap list may no longer match. Diagno
 **Symptom**: the main conversation reads large files directly, chains greps, swallows long build logs — all that raw output lands in main context, one big scan eats a quarter of the context window, and judgment quality degrades from there on.
 
 **Fix (just do this)**:
-1. Any reconnaissance work that needs "3 or more files (≥3) to answer" or "output over 100 lines" gets dispatched to a subagent (see `ops-dispatch skill`); the main conversation only receives the conclusion plus `file:line`. This threshold and `ops-dispatch skill`'s "≥3–4 rounds of tool calls" are two phrasings of the same rubric — when in doubt, go by round count.
+1. Any reconnaissance work that needs "3 or more files (≥3) to answer" or "output over 100 lines" gets dispatched to a subagent (see `upward-ops-dispatch skill`); the main conversation only receives the conclusion plus `file:line`. This threshold and `upward-ops-dispatch skill`'s "≥3–4 rounds of tool calls" are two phrasings of the same rubric — when in doubt, go by round count.
 2. Running tests/builds: pipe long output to a file (`... > /tmp/build.log 2>&1`), then only read the last 30 lines or grep for `error`.
 3. For every chunk of text about to enter context, ask: is this a **conclusion** or **raw material**? Raw material doesn't belong in the main conversation.
 
@@ -62,7 +62,7 @@ Change projects or harness config, and the trap list may no longer match. Diagno
 2. Stale artifacts: build cache, `node_modules`/`__pycache__`, old compiled output not cleaned up.
 3. Config/env: environment variables and config files not matching your assumptions.
 4. Clean reproduction: does it still reproduce from a clean clone / fresh install? (Isolates "my local state" from "the program itself.")
-5. Which layer the error originates from: stack points at a file you've never touched → the root cause is upstream (an earlier step or a dependency — go back to the regression branch of `ops-judge skill` #4).
+5. Which layer the error originates from: stack points at a file you've never touched → the root cause is upstream (an earlier step or a dependency — go back to the regression branch of `upward-ops-judge skill` #4).
 
 **Evidence gate (to stop abuse)**: "blame the environment" is the easiest excuse there is — nine times out of ten it's actually your own bug. Before accepting an environment/dependency hypothesis, **produce evidence first**: a version number that doesn't match, or a result that reproduces from a clean clone. Suspicion alone doesn't count; the default assumption stays "it's my change" until the environment hypothesis has evidence behind it.
 

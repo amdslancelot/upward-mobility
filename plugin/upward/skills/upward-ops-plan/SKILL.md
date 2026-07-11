@@ -1,5 +1,5 @@
 ---
-name: ops-plan
+name: upward-ops-plan
 description: Quality-loop orchestration for large tasks (brief → plan → execute → review → revise). Use this when starting a task with multiple deliverables, multiple steps, half a day or more of work, or output meant to stick around long-term — write the brief first (goal, acceptance criteria, assumptions, risks) to pin the direction, then break it into plan.md, execute item by item saving checkpoints, dispatch a fresh-context review when done, and work through every finding by going back and fixing the source. Use when starting a large multi-step or multi-output task that needs the full plan-execute-review-revise loop; skip for single-file or one-off work.
 ---
 
@@ -38,19 +38,19 @@ Status: <planning / executing: item N / reviewing / revising>   Updated: <date>
 
 ## The five phases (walk through these yourself)
 
-**Phase 0 — brief (before starting work)**: write the goal, acceptance criteria, assumptions, and risks into the top of plan.md. If the direction is uncertain (requirements are vague, or you're guessing at the user's preferences or business context) → stop and confirm before starting work; see `ops-judge` skill#3 for the criteria. Don't skip this step: flawless execution in the wrong direction is the most expensive failure there is.
+**Phase 0 — brief (before starting work)**: write the goal, acceptance criteria, assumptions, and risks into the top of plan.md. If the direction is uncertain (requirements are vague, or you're guessing at the user's preferences or business context) → stop and confirm before starting work; see `upward-ops-judge` skill#3 for the criteria. Don't skip this step: flawless execution in the wrong direction is the most expensive failure there is.
 
 **Phase 1 — plan**: break the task into a list, attach decidable acceptance criteria to each item, freeze it into plan.md. If you drift mid-task or hit a `/compact`, this file is the anchor that gets you back to your task list.
 
-**Phase 2 — execute**: work through items one at a time. The moment an item is done, save it and check it off in plan.md before starting the next one. At every milestone (one item, or a batch of related items, passing acceptance) commit to git as a checkpoint. Dispatch per `ops-dispatch` skill; write delegation briefs from its templates.
+**Phase 2 — execute**: work through items one at a time. The moment an item is done, save it and check it off in plan.md before starting the next one. At every milestone (one item, or a batch of related items, passing acceptance) commit to git as a checkpoint. Dispatch per `upward-ops-dispatch` skill; write delegation briefs from its templates.
 
 If an item still fails after two fix attempts → roll back to the last checkpoint first (don't stack a third fix on broken state), then split by symptom:
 - Looks like a **regression** (whack-a-mole failures, the same error resurfacing verbatim, something that used to work and doesn't anymore) → replay changes one at a time and bisect to the single culprit.
 - Looks like a **wrong approach** (fighting the tool/framework, the files you need to touch are more than double your estimate) → don't bisect; re-plan directly or escalate with the failure trace.
 
-Full criteria in `ops-judge` skill#4.
+Full criteria in `upward-ops-judge` skill#4.
 
-**Phase 3 — review**: once every item is complete, dispatch a freshly spawned fresh-context agent to review the entire output (model choice: haiku for mechanical checks like file existence/line counts/grep, sonnet for semantic checks like contradictions/ambiguity/unverified claims — if unsure, pick the higher tier; full selection guidance and prompt add-ons are in the `ops-review` skill). Give it the review dimensions explicitly, item by item. Require every finding to come with file:line and severity, require it to explicitly state "checked, nothing found" for aspects with no findings, and forbid it from editing any files.
+**Phase 3 — review**: once every item is complete, dispatch a freshly spawned fresh-context agent to review the entire output (model choice: haiku for mechanical checks like file existence/line counts/grep, sonnet for semantic checks like contradictions/ambiguity/unverified claims — if unsure, pick the higher tier; full selection guidance and prompt add-ons are in the `upward-ops-review` skill). Give it the review dimensions explicitly, item by item. Require every finding to come with file:line and severity, require it to explicitly state "checked, nothing found" for aspects with no findings, and forbid it from editing any files.
 
 **Phase 4 — revise**: work through every finding one by one — accept it and go fix the underlying output (not just relay it to the user and stop; this is the core obligation of the entire loop), or reject it with a one-sentence reason, and update plan.md's revision log. Only 0 unresolved findings counts as done. Cap review-revise at two rounds; if findings remain after the second round, list them out and ask the user.
 
@@ -76,6 +76,6 @@ Bad: review comes back with 4 findings → you paste them to the user and stop. 
 
 ## When to use this, and when not to
 
-- **Use it**: tasks with multiple deliverables (half a day or more of work), output meant to stick around long-term (operating-rule files, external-facing docs, core code), or when the cost of a mistake exceeds the cost of one review round (roughly 35-40k subagent tokens per round — see the cost section of `ops-review` skill).
+- **Use it**: tasks with multiple deliverables (half a day or more of work), output meant to stick around long-term (operating-rule files, external-facing docs, core code), or when the cost of a mistake exceeds the cost of one review round (roughly 35-40k subagent tokens per round — see the cost section of `upward-ops-review` skill).
 - **Don't use it**: a small single-file edit, a one-off draft, a question whose answer is already sitting in the conversation — the full loop's fixed cost eats the benefit; just do the work plus a lightweight check instead.
 - **Scaled-down version (medium-sized, direction already clear)**: skip the back-and-forth of phases 0/1, but keep the one non-negotiable core obligation: dispatch a fresh-context review when done → work through every finding by fixing the source → only report back once revisions are done.

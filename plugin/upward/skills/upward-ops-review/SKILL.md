@@ -1,11 +1,11 @@
 ---
-name: ops-review
+name: upward-ops-review
 description: How to dispatch a review task. Use this when you're about to review or verify a batch of outputs — covers which of the four review types (diff correctness, over-engineering, document consistency, mechanical read-back) needs which tool, the model-selection rule (Haiku verifies form, Sonnet verifies meaning), the required structure of a review prompt, and your obligations once findings come back. Use when about to dispatch a code or document review or verification.
 ---
 # How to dispatch a review task: types, models, prompt structure, findings triage
 
 > Audience: the main-conversation model. This answers "when reviewing a batch of outputs, which agent, which model, what prompt, and what to do once findings come back."
-> This complements `ops-dispatch skill`: that file covers whether to dispatch at all; this one covers how to dispatch review-shaped tasks specifically. Consolidated from the 2026-07-06 Fable 5 session transcript.
+> This complements `upward-ops-dispatch skill`: that file covers whether to dispatch at all; this one covers how to dispatch review-shaped tasks specifically. Consolidated from the 2026-07-06 Fable 5 session transcript.
 > For the full plan → execute → review → revise task-loop skeleton, see the source repo's WEAK-MODEL-PROMPT-GUIDE.md.
 
 ## 1. Sort out the review type first — the tool follows the type
@@ -16,7 +16,7 @@ description: How to dispatch a review task. Use this when you're about to review
 |---|---|---|
 | Diff/PR correctness | Does this change have bugs | `/code-review` skill or caveman:cavecrew-reviewer (consumes a git diff) |
 | Over-engineering | Abstractions/dependencies that shouldn't exist | `/ponytail-review` skill (hunts complexity only; if not installed, use general-purpose with that focus) |
-| Document consistency | Cross-file contradictions, placeholders, broken cross-references, ambiguous sentences a weaker model would misread | general-purpose agent + `ops-dispatch skill` #5 template |
+| Document consistency | Cross-file contradictions, placeholders, broken cross-references, ambiguous sentences a weaker model would misread | general-purpose agent + `upward-ops-dispatch skill` #5 template |
 | Mechanical read-back | Does the file exist? Is the content complete? Are sentences unbroken? | general-purpose agent, Haiku is enough |
 
 The rubric in one line: **use a diff tool to review a diff, use general-purpose with custom-defined checks to review content.** A specialized tool's field of view is hardcoded — any risk outside that view, it stays silent on. Silence isn't the same as "no problem."
@@ -41,7 +41,7 @@ The cost of picking wrong is asymmetric: Sonnet reviewing mechanical items costs
 Good: "do rules 3 and 7 contradict each other in an edge case?" → Sonnet; it needs reasoning.
 Bad: sending "do rules 3 and 7 contradict?" to Haiku → it returns "all PASS," the contradiction ships, and the review bought you nothing.
 
-## 4. The required structure of a review prompt (start from `ops-dispatch skill` #5, then add this)
+## 4. The required structure of a review prompt (start from `upward-ops-dispatch skill` #5, then add this)
 
 1. **State the reviewer's identity explicitly**: "You are a fresh-context reviewer; your ignorance is an asset" — anything confusing should get reported, not skipped past.
 2. **List every check dimension explicitly**, each with an actionable starting move (e.g., "project-specific leftovers: grep for these terms: [list]") — if you don't list the dimensions, the agent only checks the kind it's naturally good at.

@@ -1,5 +1,5 @@
 ---
-name: ops-judge
+name: upward-ops-judge
 description: Judgment externalized as a rubric. Check here when stuck or unsure — when to escalate the model, when a task actually counts as done, when to stop and ask the user, what signals mean the direction is wrong and you should change course instead of retrying (including "roll back before re-approaching"), how to verify a quality floor, and the honesty clause for ambiguous calls and taste judgments. Use when stuck, unsure whether a task is done, considering escalation, or deciding whether to change approach.
 ---
 # Judgment, externalized: rubric and checklist
@@ -9,7 +9,7 @@ description: Judgment externalized as a rubric. Check here when stuck or unsure 
 
 ## 1. When to escalate the model
 
-**Rule**: escalate (see `ops-dispatch skill` for the ladder) if any of these hold:
+**Rule**: escalate (see `upward-ops-dispatch skill` for the ladder) if any of these hold:
 - The same subtask has already failed (once for Haiku / twice for Sonnet), and the failure wasn't caused by the prompt missing information.
 - The task requires "picking one option among several defensible ones," and picking wrong costs more than a full day's rework.
 - The task involves deletion, data migration, or a public release, and you can't say how you'd roll it back if it goes wrong.
@@ -47,7 +47,7 @@ Everything else: pick the sensible default → state in one line in your report 
 - Every fix spawns a new error, three times in a row (that's whack-a-mole — you're fixing the wrong layer).
 - The fix touches more than double the number of files you estimated (you misjudged the scope — go back and re-read it).
 - You've started fighting the tool or framework (monkey-patching a library, working around the type system, hacking the lifecycle) instead of using it as designed.
-- The exact same error message shows up a second time (your last fix didn't take — first confirm the file you edited is actually on the execution path; if it's still stuck, check `ops-diagnose skill` #5 for environment/dependency/stale-artifact causes).
+- The exact same error message shows up a second time (your last fix didn't take — first confirm the file you edited is actually on the execution path; if it's still stuck, check `upward-ops-diagnose skill` #5 for environment/dependency/stale-artifact causes).
 
 **Good**: you start high-frequency polling as a hack to work around some API's limitation → that's fighting the tool, the real fix is a different architecture. ✅
 **Bad**: abandoning the whole approach and changing course after a single test failure — one failure is information, not a signal. ❌

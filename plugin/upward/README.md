@@ -42,18 +42,18 @@ plugin/upward/
 │   ├── hooks.json                # registers the SessionStart hook
 │   └── activate.sh               # cats core.md to stdout on session start/resume/clear/compact
 └── skills/
-    ├── ops-plan/       # brief → plan.md → execute → review → revise loop for large tasks
-    ├── ops-dispatch/   # how to pick agent type/model, delegation prompt templates, escalation ladder
-    ├── ops-review/     # which review type needs which tool/model, findings triage
-    ├── ops-judge/       # rubric: when to escalate, when a task is actually done, when to change course
-    └── ops-diagnose/   # context bloat and environment-diagnosis playbook
+    ├── upward-ops-plan/       # brief → plan.md → execute → review → revise loop for large tasks
+    ├── upward-ops-dispatch/   # how to pick agent type/model, delegation prompt templates, escalation ladder
+    ├── upward-ops-review/     # which review type needs which tool/model, findings triage
+    ├── upward-ops-judge/       # rubric: when to escalate, when a task is actually done, when to change course
+    └── upward-ops-diagnose/   # context bloat and environment-diagnosis playbook
 ```
 
 ## How it loads
 
 The `SessionStart` hook (matches `startup`, `resume`, `clear`, `compact`) runs `activate.sh`, which prints `core.md` to stdout. Claude Code injects that stdout into the session as context — so the core rules are present from the very first turn, in every new or resumed session.
 
-The five `ops-*` skills are **not** injected automatically. The core rules tell the model which skill to invoke via the Skill tool for a given situation (e.g. "starting a multi-step task" → `ops-plan`), so the detailed playbook only enters context when it's actually needed.
+The five `upward-ops-*` skills are **not** injected automatically. The core rules tell the model which skill to invoke via the Skill tool for a given situation (e.g. "starting a multi-step task" → `upward-ops-plan`), so the detailed playbook only enters context when it's actually needed.
 
 ## Notes for adapting this to another project
 
