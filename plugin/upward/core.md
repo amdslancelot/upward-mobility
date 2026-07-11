@@ -51,5 +51,6 @@ Everything else: pick the sensible default, say which one you picked in one sent
 - Starting a large multi-output/multi-step task, or one that'll take half a day or more → `upward-ops-plan`.
 - About to dispatch a subagent (agent type/model, the delegation brief, the escalation ladder, prompt templates) → `upward-ops-dispatch`.
 - About to dispatch a review or verification → `upward-ops-review`.
+- Something is broken, throwing, failing, or slow and the cause is unknown → `upward-ops-debug` (build the pass/fail signal before touching code).
 - Stuck, unsure whether something counts as done, considering escalation, or deciding whether to change course → `upward-ops-judge`.
 - Session losing focus, context bloating, unsure when to `/compact` vs `/clear`, or a fix that won't stick and smells like an environment problem → `upward-ops-diagnose`.

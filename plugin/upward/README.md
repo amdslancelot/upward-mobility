@@ -48,6 +48,7 @@ plugin/upward/
     ├── upward-ops-review/     # which review type needs which tool/model, findings triage
     ├── upward-ops-judge/       # rubric: when to escalate, when a task is actually done, when to change course
     ├── upward-ops-diagnose/   # context bloat and environment-diagnosis playbook
+    ├── upward-ops-debug/      # signal-first debugging loop: red signal before any fix, nested round budgets
     └── upward-stats/           # /upward-stats on|off|level task|level call — per-prompt/per-call token usage log
 ```
 
@@ -55,7 +56,7 @@ plugin/upward/
 
 The `SessionStart` hook (matches `startup`, `resume`, `clear`, `compact`) runs `activate.sh`, which prints `core.md` to stdout. Claude Code injects that stdout into the session as context — so the core rules are present from the very first turn, in every new or resumed session.
 
-The five `upward-ops-*` skills are **not** injected automatically. The core rules tell the model which skill to invoke via the Skill tool for a given situation (e.g. "starting a multi-step task" → `upward-ops-plan`), so the detailed playbook only enters context when it's actually needed.
+The six `upward-ops-*` skills are **not** injected automatically. The core rules tell the model which skill to invoke via the Skill tool for a given situation (e.g. "starting a multi-step task" → `upward-ops-plan`), so the detailed playbook only enters context when it's actually needed.
 
 `upward-stats` is a standalone toggle, unrelated to the always-on core rules: `/upward-stats on` writes `.upward-stats-state.json` at the project root, and the plugin's `Stop` hook checks that file after every turn, rewriting `UPWARD-STATS.md` with token usage grouped by prompt (and by individual API call, including model, at `level call`). `/upward-stats off` turns it back off. Both `UPWARD-STATS.md` and `.upward-stats-state.json` are generated/local — add them to your project's `.gitignore` if you don't want them tracked.
 
