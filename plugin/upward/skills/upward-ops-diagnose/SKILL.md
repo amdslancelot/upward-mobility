@@ -24,7 +24,7 @@ Change projects or harness config, and the trap list may no longer match. Diagno
 **Fix (just do this)**:
 1. At session start, read the CLAUDE.md index first, and **only read the file the current task's entry points to**.
 2. Don't scan all of `src/` just to "understand the project." If the index doesn't cover it, dispatch a search-type subagent instead.
-3. Learn an important fact the index doesn't have? Add it as one line to the index, per the source repo's `meta/maintenance.md`.
+3. Learn an important fact the index doesn't have? Add it as one line to the index.
 
 ## 2. Standing plugins/hooks clashing in noise and mode (environment-specific — rediagnose and rewrite when you port this)
 

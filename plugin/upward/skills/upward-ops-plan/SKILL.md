@@ -7,7 +7,6 @@ description: Quality-loop orchestration for large tasks (brief → plan → exec
 
 > Reader: the main-thread model. This is the active orchestration layer for "large task, multiple deliverables" — it takes a senior model's working instincts and writes them down as steps you follow yourself.
 > See the last section for when to use this; skip it for small tasks (the fixed overhead of the whole loop eats the benefit).
-> The human-driven version of this (the skeleton a person types prompts against) lives in the source repo's `WEAK-MODEL-PROMPT-GUIDE.md`. Both files are readers of the same loop — if you edit one, check the other.
 
 ## The problem this solves
 

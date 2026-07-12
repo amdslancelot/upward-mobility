@@ -6,7 +6,7 @@ description: How to dispatch a review task. Use this when you're about to review
 
 > Audience: the main-conversation model. This answers "when reviewing a batch of outputs, which agent, which model, what prompt, and what to do once findings come back."
 > This complements `upward-ops-dispatch skill`: that file covers whether to dispatch at all; this one covers how to dispatch review-shaped tasks specifically. Consolidated from the 2026-07-06 Fable 5 session transcript.
-> For the full plan → execute → review → revise task-loop skeleton, see the source repo's WEAK-MODEL-PROMPT-GUIDE.md.
+> For the full plan → execute → review → revise task-loop skeleton, see `upward-ops-plan skill`.
 
 ## 1. Sort out the review type first — the tool follows the type
 
@@ -50,7 +50,7 @@ Bad: sending "do rules 3 and 7 contradict?" to Haiku → it returns "all PASS," 
 5. **Require it to simulate actually following N of the rules** (specific to document review): reading isn't enough — the places where it gets stuck are the actionable bugs.
 6. **Report format + total length cap + "don't modify any files"**: the reviewer only reports; whether to fix something is the commander's call.
 
-## 5. Obligations once findings come back (same playbook as phase four of the source repo's WEAK-MODEL-PROMPT-GUIDE.md)
+## 5. Obligations once findings come back (same playbook as phase four of `upward-ops-plan skill`)
 
 1. Judge each finding individually — accept or reject. Reviewers produce false positives; accepting everything blindly is just as negligent as ignoring everything. Attach one reason when rejecting.
 2. Accepted findings get **applied back to the actual output** — relaying them to the user isn't the same as handling them.
@@ -59,4 +59,4 @@ Bad: sending "do rules 3 and 7 contradict?" to Haiku → it returns "all PASS," 
 
 ## 6. Cost reference (single measurement from 2026-07, re-weigh for your environment)
 
-Semantic review runs about 35–40k subagent tokens; mechanical read-back runs about 25–27k. Reviewing a batch of documents costs roughly 1.5–2x a normal dispatch — always worth it for "output meant to stick around long-term"; for one-off intermediate artifacts, it's fine to skip depending on context (see the "when to use this" section of the source repo's WEAK-MODEL-PROMPT-GUIDE.md for the rubric).
+Semantic review runs about 35–40k subagent tokens; mechanical read-back runs about 25–27k. Reviewing a batch of documents costs roughly 1.5–2x a normal dispatch — always worth it for "output meant to stick around long-term"; for one-off intermediate artifacts, it's fine to skip depending on context (see the "when to use this" section of `upward-ops-plan skill` for the rubric).
