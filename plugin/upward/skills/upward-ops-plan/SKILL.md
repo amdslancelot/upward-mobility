@@ -26,7 +26,11 @@ Status: <planning / executing: item N / reviewing / revising>   Updated: <date>
 - Risks / out of scope: <known risks, explicitly excluded scope>
 
 ## Task list
-- [ ] 1. <item> — Acceptance: <decidable criterion>
+- [ ] 1. <task name>
+  - Model: <haiku/sonnet/opus> — Reason: <why this tier>
+  - Target: <files/scope to touch>   Product: <what it emits: file, diff, report>
+  - Dependency: <task #s that must finish first, or —>
+  - Acceptance / Review: <decidable done-criterion + who verifies (fresh-context agent)>
 - [ ] 2. ...
 
 ## Checkpoints (log one every time a milestone passes its acceptance criteria)
