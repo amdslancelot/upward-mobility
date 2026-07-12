@@ -11,12 +11,14 @@ This skill only flips a switch. The actual recording (reading the session transc
 `.upward-stats-state.json` at the project root (current working directory). Shape:
 
 ```json
-{"enabled": false, "level": "task"}
+{"enabled": true, "level": "task"}
 ```
+
+Tracking is **on by default**: if this file is missing or unparsable, the hook treats it as `{"enabled": true, "level": "task"}`. Run `/upward-stats off` to opt out.
 
 ## On each invocation
 
-1. Read `.upward-stats-state.json` in the cwd if it exists. If missing or unparsable, treat as `{"enabled": false, "level": "task"}`.
+1. Read `.upward-stats-state.json` in the cwd if it exists. If missing or unparsable, treat as `{"enabled": true, "level": "task"}` (tracking is on by default).
 2. Apply the argument:
    - `on` → `enabled: true`
    - `off` → `enabled: false`

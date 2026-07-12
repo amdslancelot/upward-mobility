@@ -31,13 +31,15 @@ def find_recent_transcript(cwd):
 
 
 def load_state(cwd):
+    # Default on: no state file (or unparsable) means tracking is enabled.
+    default = {"enabled": True, "level": "task"}
     path = os.path.join(cwd, ".upward-stats-state.json")
     try:
         with open(path) as f:
             state = json.load(f)
     except Exception:
-        return None
-    return state if isinstance(state, dict) else None
+        return default
+    return state if isinstance(state, dict) else default
 
 
 def call_usage(msg):
