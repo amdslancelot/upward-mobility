@@ -34,7 +34,8 @@ Keep the round log in plan.md's checkpoint/revision-log format (`upward-ops-plan
 
 - Hypothesis dead twice in a row, or any wrong-direction signal → roll back to the last green checkpoint and split regression-vs-wrong-approach per `upward-ops-judge` #4. When bisecting, run the signal at every replay step — the step that turns it red is the culprit.
 - The fix looks right but won't take, or the stack points at a layer you never touched → environment checklist in the next section.
-- Escalating the model → ladder in `upward-ops-dispatch`. Always attach the signal definition and the round log; escalating without them is re-rolling the dice. Run the environment checklist first — a broken environment stumps every model tier equally, so escalating past it just wastes the ladder.
+- Two hypotheses dead, or the error originates in third-party code (a library, framework, or tool) → web search the exact error message verbatim in quotes, plus the library name and version. What you find is a **new hypothesis, not a fix**: it still enters the loop as hypothesis → minimal change → signal run, and it still counts against the budget — pasting a Stack Overflow fix without running the signal is how bugs get masked instead of fixed. Search before escalating the model: a known upstream issue costs one search to find, and no tier of the ladder can out-think a bug that lives in someone else's code.
+- Escalating the model → ladder in `upward-ops-dispatch`. Always attach the signal definition and the round log; escalating without them is re-rolling the dice. Run the environment checklist and the web search first — a broken environment or a known upstream bug stumps every model tier equally, so escalating past them just wastes the ladder.
 
 ## When the fix won't take: widen to environment (don't just stare at the failing line)
 
@@ -59,7 +60,7 @@ Debugging is almost always ≥3–4 rounds of tool calls, so per the `upward-ops
 ```
 Background: [repo + one-sentence bug report: doing X, expected Y, got Z].
 Signal: [exact command to run] — red looks like [output], green looks like [output]. Run it first and confirm it's red before changing anything; if it's green, stop and report that instead.
-Task: find the cause and fix it. One hypothesis at a time: hypothesis → minimal change → re-run signal. Log every round (hypothesis, change, result).
+Task: find the cause and fix it. One hypothesis at a time: hypothesis → minimal change → re-run signal. Log every round (hypothesis, change, result). After two dead hypotheses, or if the error comes from third-party code, web search the exact error message before forming the next hypothesis — treat anything you find as a hypothesis to verify against the signal, not a fix to paste.
 Scope: [files/dirs in scope]; do not touch [exclusion list].
 Budget: [N] rounds total; a hypothesis still red after 2 rounds gets abandoned, not retried. Budget exhausted → report the round log and stop; do not keep grinding.
 Acceptance criteria: signal green, existing tests pass, diff contains only cause-relevant changes.
