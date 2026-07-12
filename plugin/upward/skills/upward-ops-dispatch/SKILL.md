@@ -48,7 +48,7 @@ Templates are below in this skill. When delegating a "paste this content into a 
 - **Haiku fails once** → escalate to sonnet, re-dispatch the same task with the error output attached.
 - **Sonnet fails twice on the same subtask** → escalate to opus with the full failure trace (both prompts and error outputs). Escalating without the trace is just re-rolling the dice.
 - **Once opus solves the pattern** → write the solution up as explicit steps and hand it back down to sonnet/haiku for batch application.
-- **Rule out environment/dependency root causes before escalating**: escalating the model doesn't fix a broken environment (version mismatch, stale build, missing dependencies) — that kind of root cause stumps opus just as much. For a stubborn error, run the checklist in `upward-ops-diagnose skill`#5 first, then decide whether escalation is even warranted.
+- **Rule out environment/dependency root causes before escalating**: escalating the model doesn't fix a broken environment (version mismatch, stale build, missing dependencies) — that kind of root cause stumps opus just as much. For a stubborn error, run the environment checklist in `upward-ops-debug skill` first, then decide whether escalation is even warranted.
 - **Retry the same thing at most two rounds** (escalation included). The third round isn't "keep trying" — it's changing course or asking the user (see `upward-ops-judge skill` for the criteria).
 
 ## Verification isn't self-verification

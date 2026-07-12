@@ -47,8 +47,8 @@ plugin/upward/
     ├── upward-ops-dispatch/   # how to pick agent type/model, delegation prompt templates, escalation ladder
     ├── upward-ops-review/     # which review type needs which tool/model, findings triage
     ├── upward-ops-judge/       # rubric: when to escalate, when a task is actually done, when to change course
-    ├── upward-ops-diagnose/   # context bloat and environment-diagnosis playbook
-    ├── upward-ops-debug/      # signal-first debugging loop: red signal before any fix, nested round budgets
+    ├── upward-ops-diagnose/   # harness playbook: token leaks, context bloat, /compact vs /clear
+    ├── upward-ops-debug/      # signal-first debugging loop: red signal before any fix, nested round budgets, environment checklist
     └── upward-stats/           # /upward-stats on|off|level task|level call — per-prompt/per-call token usage log
 ```
 

@@ -1,6 +1,6 @@
 ---
 name: upward-ops-debug
-description: Signal-first debugging loop. Use this when something is broken, throwing, failing, or slow and the cause is unknown — build a pass/fail signal that goes red on this specific bug before touching any code, then iterate hypothesis → minimal change → re-run signal, under nested round budgets that guarantee the loop terminates. Includes the debug delegation template. Use when debugging a bug, a failing test, an error, or a performance regression.
+description: Signal-first debugging loop. Use this when something is broken, throwing, failing, or slow and the cause is unknown — build a pass/fail signal that goes red on this specific bug before touching any code, then iterate hypothesis → minimal change → re-run signal, under nested round budgets that guarantee the loop terminates. Includes the environment/dependency checklist with its evidence gate, and the debug delegation template. Use when debugging a bug, a failing test, an error, a performance regression, or a fix that should work but does not take effect.
 ---
 # Signal-First Debugging Loop
 
@@ -33,8 +33,24 @@ Keep the round log in plan.md's checkpoint/revision-log format (`upward-ops-plan
 ## When stuck, branch by symptom (pointers, not restatements)
 
 - Hypothesis dead twice in a row, or any wrong-direction signal → roll back to the last green checkpoint and split regression-vs-wrong-approach per `upward-ops-judge` #4. When bisecting, run the signal at every replay step — the step that turns it red is the culprit.
-- The fix looks right but won't take, or the stack points at a layer you never touched → environment checklist in `upward-ops-diagnose` #5. Its evidence gate runs on the signal: red from a clean clone = it's the code; green from a clean clone = it's your local state.
-- Escalating the model → ladder in `upward-ops-dispatch`. Always attach the signal definition and the round log; escalating without them is re-rolling the dice.
+- The fix looks right but won't take, or the stack points at a layer you never touched → environment checklist in the next section.
+- Escalating the model → ladder in `upward-ops-dispatch`. Always attach the signal definition and the round log; escalating without them is re-rolling the dice. Run the environment checklist first — a broken environment stumps every model tier equally, so escalating past it just wastes the ladder.
+
+## When the fix won't take: widen to environment (don't just stare at the failing line)
+
+**Symptom**: a fix that should work doesn't, or the error stack points at a file/layer you've never touched. A weaker model's default is to stare at the reported line and keep tweaking it, but the root cause can live in the environment, a dependency, or an earlier step — and this class of root cause cannot be fixed by escalating the model. Staring at it just burns your round budget on a fight you can't win.
+
+**Checklist (work through in order when the symptom won't budge)**:
+1. Versions: lockfile vs. what's actually installed; does the runtime/language version match your assumptions?
+2. Stale artifacts: build cache, `node_modules`/`__pycache__`, old compiled output not cleaned up.
+3. Config/env: environment variables and config files not matching your assumptions.
+4. Clean reproduction: run the signal from a clean clone / fresh install. **Red from a clean clone = it's the code; green from a clean clone = it's your local state.** This is the signal doing the isolating — no signal, no clean verdict.
+5. Which layer the error originates from: stack points at a file you've never touched → the root cause is upstream (an earlier step or a dependency — go back to the regression branch of `upward-ops-judge` #4).
+
+**Evidence gate (to stop abuse)**: "blame the environment" is the easiest excuse there is — nine times out of ten it's actually your own bug. Before accepting an environment/dependency hypothesis, produce evidence first: a version number that doesn't match, or a signal result from a clean clone. Suspicion alone doesn't count; the default assumption stays "it's my change" until the environment hypothesis has evidence behind it. Environment-checklist rounds count against the whole-loop budget like any other hypothesis.
+
+**Good**: `node -v` prints 18, but the lockfile pins a package that needs 20 → concrete mismatch, environment hypothesis earns its place. ✅
+**Bad**: "the test is flaky, probably a caching thing" with nothing measured → that's a guess, not evidence; keep assuming it's your change. ❌
 
 ## Delegating the debug (template)
 

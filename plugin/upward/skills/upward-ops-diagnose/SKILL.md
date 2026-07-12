@@ -1,11 +1,12 @@
 ---
 name: upward-ops-diagnose
-description: Environment diagnosis and context management. Use this when a session loses focus, context blows up, or a fix seems like it should work but the environment itself is suspect — covers the behavior patterns that leak the most tokens and how to fix them, the criteria for /compact vs /clear, and the checklist for widening your search to environment/dependencies/earlier steps plus the evidence gate that stops you from blaming the environment too fast. Use when the session loses focus, context bloats, or a fix that should work does not take effect.
+description: Harness diagnosis and context management. Use this when a session loses focus or context blows up — covers the behavior patterns that leak the most tokens and how to fix them, plus the criteria for /compact vs /clear. Use when the session loses focus, context bloats, or you are deciding between /compact and /clear. (Debugging the project itself, including environment/dependency causes, lives in upward-ops-debug.)
 ---
-# Environment diagnosis: where this harness leaks the most tokens, loses focus fastest, and breaks most often
+# Harness diagnosis: where this harness leaks the most tokens and loses focus fastest
 
 > Audience: the smaller model inheriting this project. Every rule ships with a "just do this" fix.
-> Traps 1–5 are portable across environments; sections marked "environment-specific" are already filled in for this environment (as of 2026-07-07) — rediagnose and rewrite them when you move this to another project.
+> This file covers the harness (session hygiene, token leaks, context management). Diagnosing the *project* — a bug, a fix that won't take, an environment/dependency suspect — lives in `upward-ops-debug`.
+> Traps 1–4 are portable across environments; sections marked "environment-specific" are already filled in for this environment (as of 2026-07-07) — rediagnose and rewrite them when you move this to another project.
 
 ## 0. Adopting this template? Rediagnose your environment first (do this once)
 
@@ -53,23 +54,7 @@ Change projects or harness config, and the trap list may no longer match. Diagno
 3. Don't compact mid-task.
 4. These two commands are typed by the user — your job is to proactively remind them at task boundaries, and make sure saving to file happens before compacting.
 
-## 5. When a fix won't take: widen the search to environment/dependencies (don't just stare at the failing line)
-
-**Symptom**: the same fix should work but doesn't, or the error stack points at a file/layer you've never touched. A weaker model's default is to stare at the reported line and keep tweaking it, but the root cause can live in the environment, a dependency, or an earlier step — and this class of root cause **cannot be fixed by escalating the model** (Opus fails the same way against a broken dependency). Staring at it just burns your two retry rounds on a fight you can't win.
-
-**Checklist (work through in order when the symptom won't budge)**:
-1. Versions: lockfile vs. what's actually installed; does the runtime/language version match your assumptions?
-2. Stale artifacts: build cache, `node_modules`/`__pycache__`, old compiled output not cleaned up.
-3. Config/env: environment variables and config files not matching your assumptions.
-4. Clean reproduction: does it still reproduce from a clean clone / fresh install? (Isolates "my local state" from "the program itself.")
-5. Which layer the error originates from: stack points at a file you've never touched → the root cause is upstream (an earlier step or a dependency — go back to the regression branch of `upward-ops-judge skill` #4).
-
-**Evidence gate (to stop abuse)**: "blame the environment" is the easiest excuse there is — nine times out of ten it's actually your own bug. Before accepting an environment/dependency hypothesis, **produce evidence first**: a version number that doesn't match, or a result that reproduces from a clean clone. Suspicion alone doesn't count; the default assumption stays "it's my change" until the environment hypothesis has evidence behind it.
-
-Good: `node -v` prints 18, but the lockfile pins a package that needs 20 → concrete mismatch, environment hypothesis earns its place.
-Bad: "the test is flaky, probably a caching thing" with nothing measured → that's a guess, not evidence; keep assuming it's your change.
-
 ## Minor (below the top four, but worth noting)
 
 - Long-session context compaction drops detail: write important intermediate conclusions to file **as you go**, not after.
-- The memory directory (this environment: `~/.claude/projects/-Users-lans-h-Documents-claude-main/memory/`; swap in `~/.claude/projects/<project>/memory/` when you port this) loads its index across sessions — cross-session facts belong there; single-session facts don't.
+- The memory directory (this environment: `~/.claude/projects/-Users-lans-h-Documents-claude-upward-mobility/memory/`; swap in `~/.claude/projects/<project>/memory/` when you port this) loads its index across sessions — cross-session facts belong there; single-session facts don't.

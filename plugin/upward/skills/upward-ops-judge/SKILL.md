@@ -47,7 +47,7 @@ Everything else: pick the sensible default → state in one line in your report 
 - Every fix spawns a new error, three times in a row (that's whack-a-mole — you're fixing the wrong layer).
 - The fix touches more than double the number of files you estimated (you misjudged the scope — go back and re-read it).
 - You've started fighting the tool or framework (monkey-patching a library, working around the type system, hacking the lifecycle) instead of using it as designed.
-- The exact same error message shows up a second time (your last fix didn't take — first confirm the file you edited is actually on the execution path; if it's still stuck, check `upward-ops-diagnose skill` #5 for environment/dependency/stale-artifact causes).
+- The exact same error message shows up a second time (your last fix didn't take — first confirm the file you edited is actually on the execution path; if it's still stuck, run the environment checklist in `upward-ops-debug skill` for environment/dependency/stale-artifact causes).
 
 **Good**: you start high-frequency polling as a hack to work around some API's limitation → that's fighting the tool, the real fix is a different architecture. ✅
 **Bad**: abandoning the whole approach and changing course after a single test failure — one failure is information, not a signal. ❌
