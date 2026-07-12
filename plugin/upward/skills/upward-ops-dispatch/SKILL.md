@@ -5,16 +5,13 @@ description: Delegation rules and prompt templates. Use this before handing work
 # Model Dispatch Rules
 
 > Reader: the main-thread model, any tier. Goal: keep the cheap model running the day-to-day, and spend the pricier model's tokens only on judgment calls.
-> The "verified resources" section below must be re-verified and re-stamped with today's date before you rely on it — don't just trust the template's values.
 
-## Verified resources (verified 2026-07-07 against official docs — stale? re-verify before use)
+## Verified resources (verified 2026-07-07 against official docs — stale? re-verify and re-stamp before use)
 
-- Switch the main thread's model with `/model <alias>`. Aliases: haiku / sonnet / opus / fable. Capability/cost ordering: haiku < sonnet < opus < fable.
-- Current model IDs (as of 2026-07-07, platform.claude.com models overview): claude-haiku-4-5-20251001, claude-opus-4-8, and claude-fable-5 are current. claude-sonnet-4-6 is listed as legacy; the official docs list claude-sonnet-5 as the current latest Sonnet. **Which version the `sonnet` alias actually resolves to in your harness hasn't been confirmed per-environment — check the `/model` picker yourself, don't trust this line.**
+- Model aliases: haiku / sonnet / opus / fable. Capability/cost ordering: haiku < sonnet < opus < fable. Which concrete version an alias resolves to varies by harness — check the `/model` picker, don't trust a written-down model ID.
 - The Agent tool's `model` parameter accepts the aliases above (confirmed in the sub-agents official docs).
-- Effort: the Agent tool call itself has no effort parameter. You can only set `effort: low|medium|high|xhigh|max` in `.claude/agents/*.md` frontmatter. Note: Sonnet 4.6 / Opus 4.6 have no xhigh tier; Fable 5, Sonnet 5, and Opus 4.8/4.7 have the full five tiers (verified 2026-07-07 against the model-config official docs).
-- Thinking controls: `alwaysThinkingEnabled` in settings.json, `MAX_THINKING_TOKENS` env var (Fable 5 can't turn thinking off).
-- Agent types specific to this environment (confirmed present as of 2026-07-07): caveman:cavecrew-investigator / cavecrew-builder / cavecrew-reviewer (compressed output that saves main-thread context). Porting this to an environment without the caveman plugin installed? Substitute Explore / general-purpose.
+- Effort: the Agent tool call itself has no effort parameter; effort can only be set as `effort: low|medium|high|xhigh|max` in `.claude/agents/*.md` frontmatter.
+- Agent types specific to this environment: caveman:cavecrew-investigator / cavecrew-builder / cavecrew-reviewer (compressed output that saves main-thread context). Porting this to an environment without the caveman plugin installed? Substitute Explore / general-purpose.
 
 ## Hard rule: the commander doesn't descend
 
@@ -137,7 +134,7 @@ Report format: a findings list sorted by severity; 0 findings → explicitly sta
 Special focus: [risk points specific to this task]
 ```
 
-## 6. Appending/pasting content into a file (builder, haiku) — the hard-won-lesson corrected version
+## 6. Appending/pasting content into a file (builder, haiku)
 
 ```
 Task: append content to the end of [file path] (currently [N] lines).
