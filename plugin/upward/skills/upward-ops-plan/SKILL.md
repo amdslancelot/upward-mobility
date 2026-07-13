@@ -47,13 +47,9 @@ Status: <planning / executing: item N / reviewing / revising>   Updated: <date>
 
 **Phase 2 — execute**: work through items one at a time. The moment an item is done, save it and check it off in plan.md before starting the next one. At every milestone (one item, or a batch of related items, passing acceptance) commit to git as a checkpoint. Dispatch per `upward-ops-dispatch` skill; write delegation briefs from its templates.
 
-If an item still fails after two fix attempts → roll back to the last checkpoint first (don't stack a third fix on broken state), then split by symptom:
-- Looks like a **regression** (whack-a-mole failures, the same error resurfacing verbatim, something that used to work and doesn't anymore) → replay changes one at a time and bisect to the single culprit.
-- Looks like a **wrong approach** (fighting the tool/framework, the files you need to touch are more than double your estimate) → don't bisect; re-plan directly or escalate with the failure trace.
+If an item still fails after two fix attempts, don't stack a third fix on broken state — roll back to the last checkpoint and either bisect a regression or re-plan a wrong approach. Full criteria (including how to tell the two apart) in `upward-ops-judge` skill#4.
 
-Full criteria in `upward-ops-judge` skill#4.
-
-**Phase 3 — review**: once every item is complete, dispatch a freshly spawned fresh-context agent to review the entire output (model choice: haiku for mechanical checks like file existence/line counts/grep, sonnet for semantic checks like contradictions/ambiguity/unverified claims — if unsure, pick the higher tier; full selection guidance and prompt add-ons are in the `upward-ops-review` skill). Give it the review dimensions explicitly, item by item. Require every finding to come with file:line and severity, require it to explicitly state "checked, nothing found" for aspects with no findings, and forbid it from editing any files.
+**Phase 3 — review**: once every item is complete, dispatch a freshly spawned fresh-context agent to review the entire output. Give it the review dimensions explicitly, item by item. For which model to pick and the required structure of the review prompt (findings need file:line + severity, explicit "checked, nothing found" for clean aspects, no editing allowed), see `upward-ops-review` skill.
 
 **Phase 4 — revise**: work through every finding one by one — accept it and go fix the underlying output (not just relay it to the user and stop; this is the core obligation of the entire loop), or reject it with a one-sentence reason, and update plan.md's revision log. Only 0 unresolved findings counts as done. Cap review-revise at two rounds; if findings remain after the second round, list them out and ask the user.
 
@@ -70,10 +66,7 @@ Bad: review comes back with 4 findings → you paste them to the user and stop. 
 | Assumptions written into their own field | A rollback point when things break: check whether an earlier assumption was wrong, instead of staring at the line that threw the error |
 | Plan frozen into plan.md | An anchor against mid-task drift; survives `/compact` |
 | Save immediately after every item completes | The session can be interrupted anytime — only what's saved counts; also leaves the reviewer something readable |
-| Checkpoint per milestone + roll back on failure | A weaker model defaults to stacking fixes on broken state; checkpoints let it return to known-good before bisecting or re-planning |
-| Reviewer is fresh-context + forbidden from editing | Verification isn't self-verification; the reviewer only reports, accepting or rejecting is the commander's judgment call |
 | "Go back and fix the underlying output" spelled out explicitly | A weaker model defaults to relaying findings and stopping, instead of going back to fix the prior round's results itself |
-| "Rejections need a reason" | Guards against both extremes: rubber-stamping everything (reviewers have false positives) and ignoring everything |
 | "Max two rounds" | Guards against an infinite review-revise loop burning budget |
 | Definition of done placed last | A weaker model latches onto whatever explicit definition it saw most recently; leave it out and it'll call phase 2 the finish line |
 
