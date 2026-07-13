@@ -53,7 +53,7 @@ The principle itself is one of this plugin's two always-on reflexes (see `core.m
 
 ## Dispatching a review task
 
-"Review" isn't one task, it's four. Pick the wrong tool and the review looks done but doesn't actually cover the risk:
+"Review" isn't one task, it's five. Pick the wrong tool and the review looks done but doesn't actually cover the risk:
 
 | Review type | What it's checking | Correct tool |
 |---|---|---|
@@ -61,6 +61,7 @@ The principle itself is one of this plugin's two always-on reflexes (see `core.m
 | Over-engineering | Abstractions/dependencies that shouldn't exist | general-purpose agent with that focus explicitly stated in the prompt |
 | Document consistency | Cross-file contradictions, placeholders, broken cross-references, ambiguous sentences a weaker model would misread | general-purpose agent + template #5 below |
 | Mechanical read-back | Does the file exist? Is the content complete? Are sentences unbroken? | general-purpose agent, Haiku is enough |
+| Reality check (consumer-seat smoke) | Does the artifact work when used the way its real consumer uses it — boot it, deploy it, feed it a real input | general-purpose agent that actually runs the artifact; a real run is required, "it builds" doesn't qualify |
 
 The rubric in one line: **use a diff tool to review a diff, use general-purpose with custom-defined checks to review content.** A specialized tool's field of view is hardcoded — any risk outside that view, it stays silent on. Silence isn't the same as "no problem."
 
@@ -90,6 +91,7 @@ Bad: sending "do rules 3 and 7 contradict?" to Haiku → it returns "all PASS," 
 4. **Require it to state explicitly when a dimension has no findings**: "checked X/Y/Z, no findings" and "didn't check" are two different things.
 5. **Require it to simulate actually following N of the rules** (specific to document review): reading isn't enough — the places where it gets stuck are the actionable bugs.
 6. **Report format + total length cap + "don't modify any files"**: the reviewer only reports; whether to fix something is the commander's call.
+7. **Attach the original user request verbatim, and declare the acceptance criteria suspect**: the reviewer's job includes checking the criteria against the request and against reality, not only the work against the criteria. Criteria authored inside the run inherit the author's misunderstandings — a reviewer given only the checklist will dutifully verify a wrong plan and come back all green.
 
 Once the review runs and findings come back, judging and acting on them is `upward-ops-review skill`'s job, not this one's.
 
@@ -167,8 +169,8 @@ Report format: a fact list, ≤ 2 lines + URL per item. Long quotes get saved to
 ## 5. Review (reviewer/fresh-context, sonnet) — for type/model selection and prompt add-ons, see "Dispatching a review task" above
 
 ```
-Background: [what this diff/file is for].
-Task: review [diff scope / file list], looking only for [correctness bugs | ambiguous phrasing a weak model would misread | rules that contradict each other | over-engineering] (pick one focus, review one kind per pass).
+Background: [what this diff/file is for]. Original request, verbatim: [paste the user's original request — the acceptance criteria below were authored inside this run and may themselves be wrong; checking them against the request and against reality is part of your job].
+Task: review [diff scope / file list], looking only for [correctness bugs | ambiguous phrasing a weak model would misread | rules that contradict each other | over-engineering | what breaks in real use that the criteria don't cover] (pick one focus, review one kind per pass).
 Acceptance criteria: one line per finding: location + problem + suggested fix + severity. Do not write up the parts that have no problems (no praise).
 Report format: a findings list sorted by severity; 0 findings → explicitly state "checked X/Y/Z aspects, nothing found."
 Special focus: [risk points specific to this task]
