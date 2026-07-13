@@ -1,16 +1,16 @@
 ---
 name: upward-ops-plan
-description: Quality-loop orchestration for large tasks (brief → plan → execute → review → revise). Use this when starting a task with multiple deliverables, multiple steps, half a day or more of work, or output meant to stick around long-term — write the brief first (goal, acceptance criteria, assumptions, risks) to pin the direction, then break it into plan.md, execute item by item saving checkpoints, dispatch a fresh-context review when done, and work through every finding by going back and fixing the source. Use when starting a large multi-step or multi-output task that needs the full plan-execute-review-revise loop; skip for single-file or one-off work.
+description: Turning a large task into a frozen plan.md — brief (goal, acceptance criteria, assumptions, risks) plus a task list with decidable acceptance criteria per item. Use this when starting a task with multiple deliverables, multiple steps, half a day or more of work, or output meant to stick around long-term. Stops once plan.md is frozen and hands off execution, review, and escalation to their own skills (`upward-ops-dispatch`, `upward-ops-review`, `upward-ops-judge`). Use when starting a large multi-step or multi-output task that needs a real plan before work begins; skip for single-file or one-off work.
 ---
 
-# The Lifecycle of a Large Task: brief → plan → execute → review → revise (self-applied by the model)
+# The Brief and the Plan (self-applied by the model)
 
-> Reader: the main-thread model. This is the active orchestration layer for "large task, multiple deliverables" — it takes a senior model's working instincts and writes them down as steps you follow yourself.
-> See the last section for when to use this; skip it for small tasks (the fixed overhead of the whole loop eats the benefit).
+> Reader: the main-thread model. This covers phase 0 (brief) and phase 1 (plan) of a large task — turning it into a frozen `plan.md` before any execution starts. Execution, review, and escalation are each their own skill's job once `plan.md` exists — see "Once plan.md is frozen" below.
+> See the last section for when to use this; skip it for small tasks (the fixed overhead of writing a brief and a plan eats the benefit).
 
 ## The problem this solves
 
-A Sonnet-tier commander defaults to "I executed, therefore I'm done": it won't spontaneously write a task list, won't confirm direction before starting, won't proactively dispatch a review, and when findings come back it'll just relay them to the user instead of going back to fix its own output. This loop is a senior model's instinct — a weaker model only runs it when the steps are spelled out explicitly. The most expensive mistake is flawless execution in the wrong direction — which is why phase 0's brief can't be skipped.
+A Sonnet-tier commander defaults to "I'll just start working": it won't spontaneously write a task list, and it won't confirm direction before diving in. Both failures happen before a single line of execution — the most expensive mistake is flawless execution in the wrong direction, which is exactly why phase 0's brief can't be skipped.
 
 ## plan.md template (create before starting work, maintain throughout)
 
@@ -39,24 +39,22 @@ Status: <planning / executing: item N / reviewing / revising>   Updated: <date>
 - <finding> → fixed at <file:line> | or rejected: <one-sentence reason>
 ```
 
-## The five phases (walk through these yourself)
+## The two phases this skill owns
 
-**Phase 0 — brief (before starting work)**: write the goal, acceptance criteria, assumptions, and risks into the top of plan.md. If the direction is uncertain (requirements are vague, or you're guessing at the user's preferences or business context) → stop and confirm before starting work; see `upward-ops-judge` skill#3 for the criteria. Don't skip this step: flawless execution in the wrong direction is the most expensive failure there is.
+**Phase 0 — brief (before starting work)**: write the goal, acceptance criteria, assumptions, and risks into the top of plan.md. If the direction is uncertain (requirements are vague, or you're guessing at the user's preferences or business context) → stop and confirm before starting work; see `upward-ops-judge` skill#2 for the criteria. Don't skip this step: flawless execution in the wrong direction is the most expensive failure there is.
 
-**Phase 1 — plan**: break the task into a list, attach decidable acceptance criteria to each item, freeze it into plan.md. If you drift mid-task or hit a `/compact`, this file is the anchor that gets you back to your task list.
+**Phase 1 — plan**: break the task into a list, attach decidable acceptance criteria to each item, freeze it into plan.md. When filling in each item's `Model:` and `Target:` fields, use `upward-ops-dispatch` skill's tiered dispatch cheat sheet to pick the model and agent type — a task list that doesn't know what each item costs to execute isn't a real plan. If you drift mid-task or hit a `/compact`, this file is the anchor that gets you back to your task list.
 
-**Phase 2 — execute**: work through items one at a time. The moment an item is done, save it and check it off in plan.md before starting the next one. At every milestone (one item, or a batch of related items, passing acceptance) commit to git as a checkpoint. Dispatch per `upward-ops-dispatch` skill; write delegation briefs from its templates.
+## Once plan.md is frozen
 
-If an item still fails after two fix attempts, don't stack a third fix on broken state — roll back to the last checkpoint and either bisect a regression or re-plan a wrong approach. Full criteria (including how to tell the two apart) in `upward-ops-judge` skill#4.
+Planning stops here — execution, review, and escalation are each their own skill's job, not this one's:
 
-**Phase 3 — review**: once every item is complete, dispatch a freshly spawned fresh-context agent to review the entire output. Give it the review dimensions explicitly, item by item. For which model to pick and the required structure of the review prompt (findings need file:line + severity, explicit "checked, nothing found" for clean aspects, no editing allowed), see `upward-ops-review` skill.
+- Work through the list, dispatching each item per `upward-ops-dispatch` skill.
+- Save progress and check items off in plan.md as you go; commit to git as a checkpoint at every milestone (the session can be interrupted anytime — only what's saved counts, and it leaves a reviewer something readable).
+- Once every item is done, check the work is actually done and good enough per `upward-ops-review` skill.
+- Stuck, need to escalate the model, or hit a signal the direction is wrong → `upward-ops-judge` skill.
 
-**Phase 4 — revise**: work through every finding one by one — accept it and go fix the underlying output (not just relay it to the user and stop; this is the core obligation of the entire loop), or reject it with a one-sentence reason, and update plan.md's revision log. Only 0 unresolved findings counts as done. Cap review-revise at two rounds; if findings remain after the second round, list them out and ask the user.
-
-**The definition of done is the end of phase 4, not the end of phase 2.**
-
-Good: review comes back with 4 findings → you fix 3 at the source, reject 1 with a reason, log all 4, then report "done: 3 fixed, 1 rejected."
-Bad: review comes back with 4 findings → you paste them to the user and stop. Relaying findings is not revising; phase 2 was never the finish line.
+Tell the user `plan.md` is ready rather than assuming you should charge ahead — e.g. "`plan.md` is frozen at N items — say go and I'll start executing item 1."
 
 ## What each design choice guards against in a weaker model
 
@@ -65,13 +63,9 @@ Bad: review comes back with 4 findings → you paste them to the user and stop. 
 | Pin the brief first + stop when direction is uncertain | Getting the first cut wrong — the biggest gap in a weaker commander |
 | Assumptions written into their own field | A rollback point when things break: check whether an earlier assumption was wrong, instead of staring at the line that threw the error |
 | Plan frozen into plan.md | An anchor against mid-task drift; survives `/compact` |
-| Save immediately after every item completes | The session can be interrupted anytime — only what's saved counts; also leaves the reviewer something readable |
-| "Go back and fix the underlying output" spelled out explicitly | A weaker model defaults to relaying findings and stopping, instead of going back to fix the prior round's results itself |
-| "Max two rounds" | Guards against an infinite review-revise loop burning budget |
-| Definition of done placed last | A weaker model latches onto whatever explicit definition it saw most recently; leave it out and it'll call phase 2 the finish line |
 
 ## When to use this, and when not to
 
-- **Use it**: tasks with multiple deliverables (half a day or more of work), output meant to stick around long-term (operating-rule files, external-facing docs, core code), or when the cost of a mistake exceeds the cost of one review round (roughly 35-40k subagent tokens per round — see the cost section of `upward-ops-review` skill).
-- **Don't use it**: a small single-file edit, a one-off draft, a question whose answer is already sitting in the conversation — the full loop's fixed cost eats the benefit; just do the work plus a lightweight check instead.
-- **Scaled-down version (medium-sized, direction already clear)**: skip the back-and-forth of phases 0/1, but keep the one non-negotiable core obligation: dispatch a fresh-context review when done → work through every finding by fixing the source → only report back once revisions are done.
+- **Use it**: tasks with multiple deliverables (half a day or more of work), output meant to stick around long-term (operating-rule files, external-facing docs, core code), or when the cost of a mistake exceeds the cost of one review round (see the cost-intuition section of `upward-ops-dispatch` skill for how to estimate that for your environment).
+- **Don't use it**: a small single-file edit, a one-off draft, a question whose answer is already sitting in the conversation — the fixed cost of a brief and a plan eats the benefit; just do the work plus a lightweight check instead.
+- **Scaled-down version (medium-sized, direction already clear)**: skip phase 0/1's back-and-forth entirely, but still dispatch a fresh-context review when the work is done (per `upward-ops-dispatch` skill) and work through every finding by fixing the source (per `upward-ops-review` skill) before reporting back.

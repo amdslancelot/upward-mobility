@@ -1,6 +1,6 @@
 ---
 name: upward-ops-dispatch
-description: Delegation rules and prompt templates. Use this before handing work off to a subagent — covers how to pick agent type and model, the three required elements of a delegation brief, the haiku→sonnet→opus escalation ladder, the verification-isn't-self-verification rule, and six copy-paste prompt templates for search/implementation/refactor/research/review/file-append tasks. Use before delegating any task to a subagent.
+description: Delegation rules and prompt templates — the sole "how to hand this off" authority for any task, including reviews. Covers the tiered dispatch cheat sheet (mechanical retrieval / bounded execution / judgment-heavy), the three required elements of a delegation brief, how to dispatch a review task specifically (which tool per review type, fresh-context rationale, model selection, required prompt structure), and six copy-paste prompt templates for search/implementation/refactor/research/review/file-append tasks. (When to escalate the model and the escalation ladder mechanics live in `upward-ops-judge`; judging a completed task's quality lives in `upward-ops-review`.) Use before delegating any task to a subagent.
 ---
 # Model Dispatch Rules
 
@@ -11,7 +11,7 @@ description: Delegation rules and prompt templates. Use this before handing work
 - Model aliases: haiku / sonnet / opus / fable. Capability/cost ordering: haiku < sonnet < opus < fable. Which concrete version an alias resolves to varies by harness — check the `/model` picker, don't trust a written-down model ID.
 - The Agent tool's `model` parameter accepts the aliases above (confirmed in the sub-agents official docs).
 - Effort: the Agent tool call itself has no effort parameter; effort can only be set as `effort: low|medium|high|xhigh|max` in `.claude/agents/*.md` frontmatter.
-- Agent types specific to this environment: caveman:cavecrew-investigator / cavecrew-builder / cavecrew-reviewer (compressed output that saves main-thread context). Porting this to an environment without the caveman plugin installed? Substitute Explore / general-purpose.
+- Agent types available may vary by environment (some ship specialized investigator/builder/reviewer agents with compressed output that saves main-thread context). Check what's actually installed before naming one; fall back to Explore / general-purpose otherwise.
 
 ## Hard rule: the commander doesn't descend
 
@@ -19,15 +19,18 @@ The main thread doesn't do: bulk file reading, repo scans, web lookups, batch ed
 
 ## Dispatch cheat sheet
 
-| Task | agent type | model | Why |
-|---|---|---|---|
-| Find a definition/call site/file location | caveman:cavecrew-investigator (fall back to Explore) | haiku | Pure retrieval |
-| Broad search, not sure where to look | Explore | sonnet | Needs a bit of reasoning to pick a path |
-| Mechanical edit in 1-2 files | caveman:cavecrew-builder (fall back to general-purpose) | sonnet | Scope is known, just execute |
-| Cross-file implementation, new feature | general-purpose | sonnet | Needs comprehension + implementation |
-| Diff review | /code-review skill or caveman:cavecrew-reviewer (fall back to general-purpose) | sonnet | One finding per line |
-| Architectural trade-offs, breaking down ambiguous requirements | Main thread does it directly, or Plan agent | opus | The part where a cheaper model tanks quality |
-| Verifying someone else's output | general-purpose (freshly spawned, never the agent that did the work) | haiku/sonnet | See "Verification isn't self-verification" |
+Pick the tier with one question: is the answer already there to be found (Tier 1), is the goal fixed but the path to it not (Tier 2), or is the goal itself still undecided (Tier 3)?
+
+| Tier | What belongs here | Examples | Agent type | Model | Why this model |
+|---|---|---|---|---|---|
+| **1 — Mechanical retrieval** | The answer already exists — in the repo, in the text you hand it, or as a fixed set of categories; the task is locating, extracting, classifying, or restating it, with no judgment call to make. | Find a definition, call site, or file location; read-back verification of a file (does it exist, does it cover X/Y/Z, any broken sentences); quick factual Q&A answerable straight from given context; pulling specific fields out of text (error codes, dates, names); simple summarization of a file or report; high-volume classification/tagging against a fixed category set. | Explore for repo lookups; for verification, a freshly spawned general-purpose; otherwise often no dispatch needed at all — answer inline if it's already sitting in context (see cost intuition below) | haiku | One right answer either way — retrieval or classification against fixed rules — so the cheapest model gets there as reliably as any, and cheaply enough to run at volume. |
+| **2 — Bounded execution** | The goal is fixed and decidable, but reaching it takes comprehension or picking a path. | Broad search when you're not sure where to look; mechanical edit in 1-2 files; cross-file implementation or new feature; diff review; verifying the meaning (not just the form) of someone else's output. | Explore for searches; general-purpose for everything else | sonnet | Sonnet reasons well enough to pick a path and execute it correctly, at a fraction of opus's cost. |
+| **3 — Judgment-heavy** | The goal or shape of the work is itself the question; quality hinges on trade-offs and framing, not execution. | Architectural trade-offs; breaking down ambiguous requirements; choosing between competing designs. | Main thread does it directly, or Plan agent | opus | This is exactly where a cheaper model tanks quality, so opus tokens buy the most here. |
+
+Two rules that cut across the tiers:
+
+- Verification always goes to a freshly spawned agent, never the one that did the work (concrete recipes in `upward-ops-review skill`#2). Tier it by what is being checked: form is Tier 1 (haiku), meaning is Tier 2 (sonnet).
+- When a task straddles two tiers, split it: send the judgment part up (Tier 3) and the execution part down (Tier 2), rather than sending the whole thing to the expensive model.
 
 ## The three required elements of a delegation brief (every dispatch needs all three, or don't dispatch)
 
@@ -42,23 +45,60 @@ Templates are below in this skill. When delegating a "paste this content into a 
 
 ## Escalation ladder
 
-- **Haiku fails once** → escalate to sonnet, re-dispatch the same task with the error output attached.
-- **Sonnet fails twice on the same subtask** → escalate to opus with the full failure trace (both prompts and error outputs). Escalating without the trace is just re-rolling the dice.
-- **Once opus solves the pattern** → write the solution up as explicit steps and hand it back down to sonnet/haiku for batch application.
-- **Rule out environment/dependency root causes before escalating**: escalating the model doesn't fix a broken environment (version mismatch, stale build, missing dependencies) — that kind of root cause stumps opus just as much. For a stubborn error, run the environment checklist in `upward-ops-debug skill` first, then decide whether escalation is even warranted.
-- **Retry the same thing at most two rounds** (escalation included). The third round isn't "keep trying" — it's changing course or asking the user (see `upward-ops-judge skill` for the criteria).
+When and how far to escalate the model — including the haiku→sonnet→opus mechanics, the environment-check-first rule, and the two-round retry cap — lives in `upward-ops-judge skill`#1, right next to the criteria for *when* to escalate in the first place. The two questions are judged together, since you only care about the ladder once you've already decided to climb it.
 
 ## Verification isn't self-verification
 
-The one who did the work doesn't verify their own output. Verification always goes to a freshly spawned subagent (general-purpose, never continued via SendMessage from the agent that did the work — called "fresh-context" below):
+The principle itself is one of this plugin's two always-on reflexes (see `core.md`). The concrete recipes — which agent to dispatch to check a file, code, or a high-stakes judgment call — live in `upward-ops-review skill`#2, right alongside the quality-floor rubric they support.
 
-- **For files**: read-back — dispatch haiku to read the file and report "Does it exist? Does it cover X/Y/Z? Any broken sentences or gaps?"
-- **For code**: run the tests or a real execution. "Looks right" doesn't count.
-- **For high-stakes judgment calls**: get a second opinion — dispatch another agent to answer the same question independently and compare for divergence, or have a judge pick the best of multiple answers.
+## Dispatching a review task
+
+"Review" isn't one task, it's four. Pick the wrong tool and the review looks done but doesn't actually cover the risk:
+
+| Review type | What it's checking | Correct tool |
+|---|---|---|
+| Diff/PR correctness | Does this change have bugs | general-purpose agent given the git diff and a correctness-only focus |
+| Over-engineering | Abstractions/dependencies that shouldn't exist | general-purpose agent with that focus explicitly stated in the prompt |
+| Document consistency | Cross-file contradictions, placeholders, broken cross-references, ambiguous sentences a weaker model would misread | general-purpose agent + template #5 below |
+| Mechanical read-back | Does the file exist? Is the content complete? Are sentences unbroken? | general-purpose agent, Haiku is enough |
+
+The rubric in one line: **use a diff tool to review a diff, use general-purpose with custom-defined checks to review content.** A specialized tool's field of view is hardcoded — any risk outside that view, it stays silent on. Silence isn't the same as "no problem."
+
+**Fresh-context isn't a formality, it's a test condition.** Reviews always spin up a new agent (never `SendMessage` to continue any prior agent), for two reasons:
+
+1. **Verification isn't self-verification**: whoever did the work (or any agent that watched the work happen) carries the author's point of view, and will mentally fill in context the document never actually states — so it can't see the ambiguity.
+2. **A cold start *is* the reader simulation**: the target reader for operating-rule files and docs is exactly "a weaker model with no prior context." Wherever a fresh-context agent gets confused, future sessions will get confused too. Its confusion is data, not noise.
+
+Real example: one review caught "the README describes five templates, but there are actually six files" — the author had just added the sixth one, and from their point of view it was "obviously known," so self-review would never have caught that bug.
+
+**Model selection: Haiku verifies form, Sonnet verifies meaning.**
+
+- **Haiku**: when the checklist can be fully mechanized — file exists, line count, a grep returns 0 hits, all headings present.
+- **Sonnet**: when a finding requires reasoning — "this sentence has two readings," "this number looks generic but is actually leftover project-specific cruft," "these two rules conflict in an edge case."
+- **Opus**: only when the thing under review is itself a high-stakes judgment call (architectural decisions, security boundaries) that needs a second opinion.
+
+The cost of picking wrong is asymmetric: Sonnet reviewing mechanical items costs about 1.5x more — a minor loss. Haiku reviewing semantic items comes back with a false-negative "all PASS," which guts the entire point of the review. **When unsure, round up.**
+
+Good: "do rules 3 and 7 contradict each other in an edge case?" → Sonnet; it needs reasoning.
+Bad: sending "do rules 3 and 7 contradict?" to Haiku → it returns "all PASS," the contradiction ships, and the review bought you nothing.
+
+**The required structure of a review prompt** (start from template #5 below, then add this):
+
+1. **State the reviewer's identity explicitly**: "You are a fresh-context reviewer; your ignorance is an asset" — anything confusing should get reported, not skipped past.
+2. **List every check dimension explicitly**, each with an actionable starting move (e.g., "project-specific leftovers: grep for these terms: [list]") — if you don't list the dimensions, the agent only checks the kind it's naturally good at.
+3. **Give a rule for telling "the rule itself" apart from "example context"** — without it, the agent will report a legitimate example as a bug, and false positives will drown out the real findings.
+4. **Require it to state explicitly when a dimension has no findings**: "checked X/Y/Z, no findings" and "didn't check" are two different things.
+5. **Require it to simulate actually following N of the rules** (specific to document review): reading isn't enough — the places where it gets stuck are the actionable bugs.
+6. **Report format + total length cap + "don't modify any files"**: the reviewer only reports; whether to fix something is the commander's call.
+
+Once the review runs and findings come back, judging and acting on them is `upward-ops-review skill`'s job, not this one's.
 
 ## Cost intuition (for the moments you're not sure whether dispatching is worth it)
 
-- Dispatching has a fixed cost of roughly 20k subagent tokens (cold start: loading the system prompt, reading files to rebuild context, multiple execution rounds). The deciding factor is the task's **number of execution rounds**, not its difficulty: ≥3-4 rounds of tool calls, or it needs to ingest a lot of raw material → dispatch, it's worth it. The answer is already sitting in the main thread's context and it's a one-line question → don't dispatch, just answer it.
+Don't trust a stamped token figure — cold-start cost depends entirely on what's actually loaded in the *current* environment (standing plugin/hook injections at session start, the system prompt, any skill files a task pulls in), and that shifts as the environment changes. Estimate it yourself instead: check what showed up in the first API call of a session log, sum it, and treat that as your fixed-cost floor before dispatching.
+
+- The deciding factor is the task's **number of execution rounds**, not its difficulty: ≥3-4 rounds of tool calls, or it needs to ingest a lot of raw material → dispatch, it's worth it. The answer is already sitting in the main thread's context and it's a one-line question → don't dispatch, just answer it.
+- Reviewing a batch of documents typically costs noticeably more than a normal dispatch — a semantic pass needs more reasoning rounds than a mechanical read-back does. Always worth it for output meant to stick around long-term; for one-off intermediate artifacts, it's fine to skip depending on context (see `upward-ops-plan skill`'s "when to use this" section for the rubric).
 - Write the delegation prompt with the full background it needs — don't make it re-discover things you already know.
 - Don't spin up a new agent for every small follow-up question in a row: continue the same agent with SendMessage (keeps context, saves the cold-start cost).
 
@@ -124,7 +164,7 @@ Acceptance criteria: every question has either "answer + source" or "UNVERIFIED 
 Report format: a fact list, ≤ 2 lines + URL per item. Long quotes get saved to [scratch path], report the path back.
 ```
 
-## 5. Review (reviewer/fresh-context, sonnet) — for type/model selection and prompt add-ons, see `upward-ops-review skill`
+## 5. Review (reviewer/fresh-context, sonnet) — for type/model selection and prompt add-ons, see "Dispatching a review task" above
 
 ```
 Background: [what this diff/file is for].
@@ -153,6 +193,6 @@ Report format: start and end line numbers of the appended content + PASS/FAIL fo
 
 ## Main thread's obligations after dispatching
 
-- When a report comes back, check it against the acceptance criteria item by item before accepting it. If it doesn't pass, handle it per the escalation ladder (`upward-ops-dispatch skill`).
+- When a report comes back, check it against the acceptance criteria item by item before accepting it. If it doesn't pass, handle it per `upward-ops-judge skill`#1 (when and how far to escalate).
 - If line numbers/figures in the report look inconsistent, the main thread must read the file itself to verify before reporting to the user.
 - When relaying a report's conclusions to the user, restate them in full sentences — don't paste the subagent's compressed output verbatim.

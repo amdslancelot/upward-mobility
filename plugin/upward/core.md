@@ -12,7 +12,7 @@ Everything else loads on demand. These two don't, because they gate *when* you r
 
 **The commander doesn't descend.** Bulk reading, repo scans, batch edits, verification runs — all of it goes to a subagent. The main thread only receives "conclusion + file:line." Its job is: break down the task, make the calls, synthesize conclusions, talk to the user. Threshold: if it means reading more than three files, or the investigation would produce over a hundred lines of output, delegate it. (How to delegate → `upward-ops-dispatch`.)
 
-**Verification isn't self-verification.** A completion claim needs execution evidence — build, test, real run, read-back. "Looks right" doesn't count. Verification always goes to a freshly spawned general-purpose agent, never back to the agent that did the work; that agent can't see its own blind spots or the context it hallucinated to fill gaps. (How to dispatch a review → `upward-ops-review`.)
+**Verification isn't self-verification.** A completion claim needs execution evidence — build, test, real run, read-back. "Looks right" doesn't count. Verification always goes to a freshly spawned general-purpose agent, never back to the agent that did the work; that agent can't see its own blind spots or the context it hallucinated to fill gaps. (How to dispatch a review → `upward-ops-dispatch`. Whether the result is actually good enough → `upward-ops-review`.)
 
 ## Hard rules
 
@@ -24,8 +24,8 @@ Everything else loads on demand. These two don't, because they gate *when* you r
 ## Where the details live (call the matching skill via the Skill tool)
 
 - Starting a large multi-output/multi-step task, or one that'll take half a day or more → `upward-ops-plan`.
-- About to dispatch a subagent — agent type/model, the delegation brief, the escalation ladder, the verify-not-self-verify mechanics, prompt templates → `upward-ops-dispatch`.
-- About to dispatch a review or verification → `upward-ops-review`.
-- Something is broken, throwing, failing, or slow and the cause is unknown, or a fix that should work won't take → `upward-ops-debug` (build the pass/fail signal before touching code; includes the environment checklist).
-- Stuck, unsure whether something counts as done, considering escalation, deciding whether to roll back and change course, or whether to stop and ask the user → `upward-ops-judge`.
-- Session losing focus, context bloating, unsure when to `/compact` vs `/clear` → `upward-ops-diagnose`.
+- About to dispatch anything to a subagent — agent type/model/tier, the delegation brief, the escalation ladder, prompt templates, including how to dispatch a review → `upward-ops-dispatch`.
+- Checking whether a completed task is actually done and good enough — quality floor by artifact type, findings triage → `upward-ops-review`.
+- Something is broken, throwing, failing, or slow and the cause is unknown, or a fix that should work won't take → `upward-debug` (build the pass/fail signal before touching code; includes the environment checklist).
+- Stuck, considering escalation, hitting a signal the direction is wrong, unsure whether to stop and ask the user, or facing a taste/ambiguous judgment call → `upward-ops-judge`.
+- Session losing focus, context bloating, unsure when to `/compact` vs `/clear` → `upward-harness-diagnose`.

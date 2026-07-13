@@ -271,8 +271,8 @@ def aggregate_all_calls(path):
 def process_subagents(session_dir, cache):
     """A subagent's row is only emitted once its jsonl file's size is
     unchanged from the previous Stop event — proof it's done writing.
-    ponytail: a background agent that's still growing gets skipped this turn
-    and picked up whole+accurate on a later one, rather than emitted early
+    A background agent that's still growing gets skipped this turn and
+    picked up whole+accurate on a later one, rather than emitted early
     with a count that can never be corrected."""
     subdir = os.path.join(session_dir, "subagents")
     if not os.path.isdir(subdir):

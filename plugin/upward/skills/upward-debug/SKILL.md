@@ -1,10 +1,10 @@
 ---
-name: upward-ops-debug
-description: Signal-first debugging loop. Use this when something is broken, throwing, failing, or slow and the cause is unknown — build a pass/fail signal that goes red on this specific bug before touching any code, then iterate hypothesis → minimal change → re-run signal, under nested round budgets that guarantee the loop terminates. Includes the environment/dependency checklist with its evidence gate, and the debug delegation template. Use when debugging a bug, a failing test, an error, a performance regression, or a fix that should work but does not take effect.
+name: upward-debug
+description: Signal-first debugging loop. Standalone tool, usable with or without the plan/dispatch/review/judge loop. Use this when something is broken, throwing, failing, or slow and the cause is unknown — build a pass/fail signal that goes red on this specific bug before touching any code, then iterate hypothesis → minimal change → re-run signal, under nested round budgets that guarantee the loop terminates. Includes the environment/dependency checklist with its evidence gate, and the debug delegation template. Use when debugging a bug, a failing test, an error, a performance regression, or a fix that should work but does not take effect.
 ---
 # Signal-First Debugging Loop
 
-> Reader: the main-thread model, any tier. This skill covers *finding the cause*. What to do after repeated failure (rollback, changing course, escalation) already lives in `upward-ops-judge` and `upward-ops-dispatch` — this file only points there, it does not restate those rules.
+> Reader: the main-thread model, any tier. This skill covers *finding the cause*. What to do after repeated failure (rollback, changing course, escalation, the escalation ladder) already lives in `upward-ops-judge`; this file only points there, it does not restate those rules.
 
 ## Rule zero: no signal, no fixing
 
@@ -23,7 +23,7 @@ One round = one hypothesis, one minimal change, one signal run.
 2. Make the smallest change that tests that hypothesis — one variable at a time.
 3. Run the signal. Green → go to "Done" below. Red → log the round, form the next hypothesis.
 
-Keep the round log in plan.md's checkpoint/revision-log format (`upward-ops-plan` has the template). The log is what makes "check whether an earlier step went wrong" possible later, and it's what you hand over when escalating.
+Keep the round log inline as you go — one line per round: `hypothesis → change → result (red/green)`. It's what makes "check whether an earlier step went wrong" possible later, and it's what you hand over when escalating. (Running this loop inside an active `upward-ops-plan` session? Nothing stops you from also logging rounds into that `plan.md`'s revision log — this skill just doesn't require it, since it's meant to work standalone too.)
 
 ## Nested round budgets (what makes the loop terminate)
 
@@ -32,10 +32,10 @@ Keep the round log in plan.md's checkpoint/revision-log format (`upward-ops-plan
 
 ## When stuck, branch by symptom (pointers, not restatements)
 
-- Hypothesis dead twice in a row, or any wrong-direction signal → roll back to the last green checkpoint and split regression-vs-wrong-approach per `upward-ops-judge` #4. When bisecting, run the signal at every replay step — the step that turns it red is the culprit.
+- Hypothesis dead twice in a row, or any wrong-direction signal → roll back to the last green checkpoint and split regression-vs-wrong-approach per `upward-ops-judge` #1. When bisecting, run the signal at every replay step — the step that turns it red is the culprit.
 - The fix looks right but won't take, or the stack points at a layer you never touched → environment checklist in the next section.
 - Two hypotheses dead, or the error originates in third-party code (a library, framework, or tool) → web search the exact error message verbatim in quotes, plus the library name and version. What you find is a **new hypothesis, not a fix**: it still enters the loop as hypothesis → minimal change → signal run, and it still counts against the budget — pasting a Stack Overflow fix without running the signal is how bugs get masked instead of fixed. Search before escalating the model: a known upstream issue costs one search to find, and no tier of the ladder can out-think a bug that lives in someone else's code.
-- Escalating the model → ladder in `upward-ops-dispatch`. Always attach the signal definition and the round log; escalating without them is re-rolling the dice. Run the environment checklist and the web search first — a broken environment or a known upstream bug stumps every model tier equally, so escalating past them just wastes the ladder.
+- Escalating the model → see `upward-ops-judge` #1 for both the criteria and the ladder mechanics. Always attach the signal definition and the round log; escalating without them is re-rolling the dice. Run the environment checklist and the web search first — a broken environment or a known upstream bug stumps every model tier equally, so escalating past them just wastes the ladder.
 
 ## When the fix won't take: widen to environment (don't just stare at the failing line)
 
@@ -46,7 +46,7 @@ Keep the round log in plan.md's checkpoint/revision-log format (`upward-ops-plan
 2. Stale artifacts: build cache, `node_modules`/`__pycache__`, old compiled output not cleaned up.
 3. Config/env: environment variables and config files not matching your assumptions.
 4. Clean reproduction: run the signal from a clean clone / fresh install. **Red from a clean clone = it's the code; green from a clean clone = it's your local state.** This is the signal doing the isolating — no signal, no clean verdict.
-5. Which layer the error originates from: stack points at a file you've never touched → the root cause is upstream (an earlier step or a dependency — go back to the regression branch of `upward-ops-judge` #4).
+5. Which layer the error originates from: stack points at a file you've never touched → the root cause is upstream (an earlier step or a dependency — go back to the regression branch of `upward-ops-judge` #1).
 
 **Evidence gate (to stop abuse)**: "blame the environment" is the easiest excuse there is — nine times out of ten it's actually your own bug. Before accepting an environment/dependency hypothesis, produce evidence first: a version number that doesn't match, or a signal result from a clean clone. Suspicion alone doesn't count; the default assumption stays "it's my change" until the environment hypothesis has evidence behind it. Environment-checklist rounds count against the whole-loop budget like any other hypothesis.
 
@@ -70,5 +70,5 @@ Report format: root cause in one sentence + file:line, summary of the fix, the r
 ## Done = signal green and nothing else broke
 
 1. Signal green **and** the existing test suite passes (a fix that breaks something else is a new bug, not a fix).
-2. Verification goes to a freshly spawned agent per the core rules (`upward-ops-review` for the dispatch details). It re-runs the signal and the tests — two commands of hard evidence, no need to understand the fix.
+2. Verification goes to a freshly spawned agent per the core rules (`upward-ops-dispatch` for the dispatch details). It re-runs the signal and the tests — two commands of hard evidence, no need to understand the fix.
 3. The signal graduates: commit it as a permanent test, so this bug can never come back silently.

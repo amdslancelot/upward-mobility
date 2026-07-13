@@ -43,20 +43,20 @@ plugin/upward/
 │   ├── activate.sh               # cats core.md to stdout on session start/resume/clear/compact
 │   └── upward_stats.py           # Stop hook: writes UPWARD-STATS.md when upward-stats is on
 └── skills/
-    ├── upward-ops-plan/       # brief → plan.md → execute → review → revise loop for large tasks
-    ├── upward-ops-dispatch/   # how to pick agent type/model, delegation prompt templates, escalation ladder
-    ├── upward-ops-review/     # which review type needs which tool/model, findings triage
-    ├── upward-ops-judge/       # rubric: when to escalate, when a task is actually done, when to change course
-    ├── upward-ops-diagnose/   # harness playbook: token leaks, context bloat, /compact vs /clear
-    ├── upward-ops-debug/      # signal-first debugging loop: red signal before any fix, nested round budgets, environment checklist
-    └── upward-stats/           # /upward-stats on|off|level task|level call — per-prompt/per-call token usage log
+    ├── upward-ops-plan/         # brief → frozen plan.md for large tasks; hands off execution/review/escalation to the skills below
+    ├── upward-ops-dispatch/     # how to pick agent type/model/tier, delegation prompt templates, escalation ladder, how to dispatch a review
+    ├── upward-ops-review/       # is a completed task actually done and good enough — quality floor by artifact type, findings triage
+    ├── upward-ops-judge/        # rubric: when to escalate the model vs. roll back and change course, when to ask the user, taste-judgment honesty clause
+    ├── upward-harness-diagnose/ # standalone harness playbook: token leaks, context bloat, /compact vs /clear
+    ├── upward-debug/            # standalone signal-first debugging loop: red signal before any fix, nested round budgets, environment checklist
+    └── upward-stats/             # /upward-stats on|off|level task|level call — per-prompt/per-call token usage log
 ```
 
 ## How it loads
 
 The `SessionStart` hook (matches `startup`, `resume`, `clear`, `compact`) runs `activate.sh`, which prints `core.md` to stdout. Claude Code injects that stdout into the session as context — so the core rules are present from the very first turn, in every new or resumed session.
 
-The six `upward-ops-*` skills are **not** injected automatically. The core rules tell the model which skill to invoke via the Skill tool for a given situation (e.g. "starting a multi-step task" → `upward-ops-plan`), so the detailed playbook only enters context when it's actually needed.
+None of the six skills above are injected automatically. The core rules tell the model which skill to invoke via the Skill tool for a given situation (e.g. "starting a multi-step task" → `upward-ops-plan`), so the detailed playbook only enters context when it's actually needed. Four of them (`upward-ops-plan`, `upward-ops-dispatch`, `upward-ops-review`, `upward-ops-judge`) form one operating loop — plan hands off to dispatch for execution, review checks the result, judge handles getting stuck — while `upward-debug` and `upward-harness-diagnose` are standalone tools usable with or without that loop, which is why their names drop the `-ops-` prefix.
 
 `upward-stats` is a standalone toggle, unrelated to the always-on core rules: `/upward-stats on` writes `.upward-stats-state.json` at the project root, and the plugin's `Stop` hook checks that file after every turn, rewriting `UPWARD-STATS.md` with token usage grouped by prompt (and by individual API call, including model, at `level call`). `/upward-stats off` turns it back off. Both `UPWARD-STATS.md` and `.upward-stats-state.json` are generated/local — add them to your project's `.gitignore` if you don't want them tracked.
 

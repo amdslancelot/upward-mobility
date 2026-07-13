@@ -1,11 +1,11 @@
 ---
-name: upward-ops-diagnose
-description: Harness diagnosis and context management. Use this when a session loses focus or context blows up — covers the behavior patterns that leak the most tokens and how to fix them, plus the criteria for /compact vs /clear. Use when the session loses focus, context bloats, or you are deciding between /compact and /clear. (Debugging the project itself, including environment/dependency causes, lives in upward-ops-debug.)
+name: upward-harness-diagnose
+description: Harness diagnosis and context management. Standalone tool, usable with or without the plan/dispatch/review/judge loop. Use this when a session loses focus or context blows up — covers the behavior patterns that leak the most tokens and how to fix them, plus the criteria for /compact vs /clear. Use when the session loses focus, context bloats, or you are deciding between /compact and /clear. (Debugging the project itself, including environment/dependency causes, lives in upward-debug.)
 ---
 # Harness diagnosis: where this harness leaks the most tokens and loses focus fastest
 
 > Audience: the smaller model inheriting this project. Every rule ships with a "just do this" fix.
-> This file covers the harness (session hygiene, token leaks, context management). Diagnosing the *project* — a bug, a fix that won't take, an environment/dependency suspect — lives in `upward-ops-debug`.
+> This file covers the harness (session hygiene, token leaks, context management). Diagnosing the *project* — a bug, a fix that won't take, an environment/dependency suspect — lives in `upward-debug`.
 > Traps 1–4 are portable across environments; sections marked "environment-specific" are already filled in for this environment (as of 2026-07-07) — rediagnose and rewrite them when you move this to another project.
 
 ## 0. Adopting this template? Rediagnose your environment first (do this once)
@@ -28,11 +28,11 @@ Change projects or harness config, and the trap list may no longer match. Diagno
 
 ## 2. Standing plugins/hooks clashing in noise and mode (environment-specific — rediagnose and rewrite when you port this)
 
-**Symptom** (this environment, as of 2026-07-07): two standing plugins — caveman (terse-speech mode) and ponytail (laziest-implementation mode) — inject roughly 2k tokens per session. Weaker models let "save words" bleed into places it shouldn't (docs, commits, security warnings), and misread "shortest diff" as "skip understanding, edit immediately."
+**Symptom**: any standing plugin or hook that injects a persistent style or mode instruction (a terse-speech mode, a forced-minimal-implementation mode, a persona overlay) adds standing token overhead every session, and a weaker model lets that instruction bleed into places it shouldn't (docs, commits, security warnings) or misreads it as license to skip understanding before editing.
 
 **Fix (just do this)**:
-1. Speech compression only applies to conversational replies. The test: does this text get saved into the repo? If yes, write full sentences normally.
-2. Before touching code, read every file the change will touch, *then* pick the minimal approach. If partway through you find the file count is more than double your estimate, stop, re-read the scope, update the estimate, and only then continue. Still over? Change course or escalate per `upward-ops-judge skill` #4.
+1. Style/mode compression only applies to conversational replies. The test: does this text get saved into the repo? If yes, write full sentences normally.
+2. Before touching code, read every file the change will touch, *then* pick the minimal approach. If partway through you find the file count is more than double your estimate, stop, re-read the scope, update the estimate, and only then continue. Still over? Change course or escalate per `upward-ops-judge skill` #1.
 3. When the user asks you to turn a mode off, do it immediately — don't drift back to it a few turns later.
 
 ## 3. The main conversation doing bulk reads/execution itself (the behavior pattern that leaks the most tokens)
@@ -56,5 +56,4 @@ Change projects or harness config, and the trap list may no longer match. Diagno
 
 ## Minor (below the top four, but worth noting)
 
-- Long-session context compaction drops detail: write important intermediate conclusions to file **as you go**, not after.
-- The memory directory (this environment: `~/.claude/projects/-Users-lans-h-Documents-claude-upward-mobility/memory/`; swap in `~/.claude/projects/<project>/memory/` when you port this) loads its index across sessions — cross-session facts belong there; single-session facts don't.
+- Long-session context compaction drops detail: write important intermediate conclusions to file **as you go** and **notify user**, not after.
