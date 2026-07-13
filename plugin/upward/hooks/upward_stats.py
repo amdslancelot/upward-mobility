@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 # upward-stats — Stop hook. Runs after every turn; no-op unless
-# .upward-stats-state.json (project root) has {"enabled": true}.
+# .upward/stats-state.json (under the project root) has {"enabled": true}.
 # When enabled, resumes parsing the session transcript from where it left off
-# (byte offset cached in .upward-stats-cache.json) and appends only the rows
-# for newly-completed tasks to UPWARD-STATS.md — it never rereads the whole
-# transcript or rewrites the whole file. Subagent rows are held back until
+# (byte offset cached in .upward/stats-cache.json) and appends only the rows
+# for newly-completed tasks to .upward/UPWARD-STATS.md — it never rereads the
+# whole transcript or rewrites the whole file. Everything lives in the .upward/
+# dot-directory so repo scans and glob patterns skip it by default. Subagent rows are held back until
 # their jsonl file's size is unchanged across two consecutive Stop events
 # (i.e. the subagent has finished writing); this avoids emitting a row for a
 # still-running background agent and then never being able to fix the count.
@@ -34,10 +35,36 @@ def find_recent_transcript(cwd):
     return max(candidates, key=os.path.getmtime)
 
 
+def upward_dir(cwd):
+    return os.path.join(cwd, ".upward")
+
+
+def migrate_root_files(cwd):
+    """Plugin versions before 0.2.0 wrote the three stats files directly at
+    the project root. Move the state file (user-set preference) into .upward/
+    and delete the two generated files — the hook regenerates them there."""
+    old_state = os.path.join(cwd, ".upward-stats-state.json")
+    new_state = os.path.join(upward_dir(cwd), "stats-state.json")
+    try:
+        if os.path.isfile(old_state):
+            if os.path.exists(new_state):
+                os.remove(old_state)
+            else:
+                os.makedirs(upward_dir(cwd), exist_ok=True)
+                os.replace(old_state, new_state)
+    except Exception:
+        pass
+    for name in (".upward-stats-cache.json", "UPWARD-STATS.md"):
+        try:
+            os.remove(os.path.join(cwd, name))
+        except Exception:
+            pass
+
+
 def load_state(cwd):
     # Default on: no state file (or unparsable) means tracking is enabled.
     default = {"enabled": True, "level": "task"}
-    path = os.path.join(cwd, ".upward-stats-state.json")
+    path = os.path.join(upward_dir(cwd), "stats-state.json")
     try:
         with open(path) as f:
             state = json.load(f)
@@ -47,11 +74,11 @@ def load_state(cwd):
 
 
 def cache_path(cwd):
-    return os.path.join(cwd, ".upward-stats-cache.json")
+    return os.path.join(upward_dir(cwd), "stats-cache.json")
 
 
 def stats_path(cwd):
-    return os.path.join(cwd, "UPWARD-STATS.md")
+    return os.path.join(upward_dir(cwd), "UPWARD-STATS.md")
 
 
 def empty_cache(transcript_path, level):
@@ -388,10 +415,15 @@ def main():
     hook_input = read_hook_input()
     cwd = hook_input.get("cwd") or os.getcwd()
 
+    migrate_root_files(cwd)
     state = load_state(cwd)
     if not state or not state.get("enabled"):
         return
     level = state.get("level") if state.get("level") in ("task", "call") else "task"
+    try:
+        os.makedirs(upward_dir(cwd), exist_ok=True)
+    except Exception:
+        return
 
     transcript_path = hook_input.get("transcript_path")
     if not transcript_path or not os.path.isfile(transcript_path):

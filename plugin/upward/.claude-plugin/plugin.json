@@ -1,6 +1,6 @@
 {
   "name": "upward",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Operating discipline for delegating work to cheaper models: commander-doesn't-descend, verify-not-self-verify, model escalation ladder, rollback-before-reapproach. Always-on core injected via SessionStart hook; detailed rules loaded on demand as skills.",
   "author": {
     "name": "Lans Hung"
