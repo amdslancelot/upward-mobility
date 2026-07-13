@@ -112,7 +112,7 @@ Don't trust a stamped token figure — cold-start cost depends entirely on what'
 ```
 Background: [one or two sentences: what this repo is, what I'm doing, why this subtask is needed]
 Task: [the concrete thing to do]
-Scope: [which files/directories are in scope; explicitly state what NOT to touch]
+Scope: [which files/directories are in scope; explicitly state what NOT to touch. Always exclude the .upward/ directory — it's generated tooling state (token-usage logs, hook caches), not project content]
 Acceptance criteria: [decidable definition of done, itemized]
 Report format: [conclusion + file:line; long artifacts get written to (path), report the path back; do not paste full source dumps/full logs]
 ```
@@ -122,7 +122,7 @@ Report format: [conclusion + file:line; long artifacts get written to (path), re
 ```
 Background: the repo is at [path], it's [one-sentence description]. I need [motivation].
 Task: find [target: definition/call sites/data flow/convention]. Start by searching these keywords: [term1, term2, ...].
-Scope: [all of src/ | a specific directory]. Read-only, no edits.
+Scope: [all of src/ | a specific directory]. Read-only, no edits. Ignore the .upward/ directory — generated token-usage logs, not project content.
 Acceptance criteria: every finding comes with file:line; if nothing's found, list the patterns and directories searched (proof of a real search, not a missed one).
 Report format: a file:line table, one sentence of explanation per row, total length ≤ 40 lines. Do not suggest fixes.
 ```
