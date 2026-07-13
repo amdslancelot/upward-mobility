@@ -1,10 +1,14 @@
 #!/usr/bin/env python3
 # upward-stats — Stop hook. Runs after every turn; no-op unless
 # .upward-stats-state.json (project root) has {"enabled": true}.
-# When enabled, re-parses the session transcript and rewrites UPWARD-STATS.md
-# with per-prompt (task) or per-API-call token usage, grouped by the prompt
-# that triggered each call. Never raises past main() — a stats bug must not
-# break the user's session.
+# When enabled, resumes parsing the session transcript from where it left off
+# (byte offset cached in .upward-stats-cache.json) and appends only the rows
+# for newly-completed tasks to UPWARD-STATS.md — it never rereads the whole
+# transcript or rewrites the whole file. Subagent rows are held back until
+# their jsonl file's size is unchanged across two consecutive Stop events
+# (i.e. the subagent has finished writing); this avoids emitting a row for a
+# still-running background agent and then never being able to fix the count.
+# Never raises past main() — a stats bug must not break the user's session.
 import glob
 import json
 import os
@@ -42,6 +46,50 @@ def load_state(cwd):
     return state if isinstance(state, dict) else default
 
 
+def cache_path(cwd):
+    return os.path.join(cwd, ".upward-stats-cache.json")
+
+
+def stats_path(cwd):
+    return os.path.join(cwd, "UPWARD-STATS.md")
+
+
+def empty_cache(transcript_path, level):
+    return {
+        "transcript_path": transcript_path,
+        "level": level,
+        "offset": 0,
+        "current_pid": None,
+        "tasks": {},
+        "order": [],
+        "seen_msg_ids": [],
+        "emitted_pids": [],
+        "subagents": {},
+    }
+
+
+def load_cache(cwd, transcript_path, level):
+    """Returns (cache, reset). reset is True when the cache didn't match this
+    transcript/level (new session, or user flipped /upward-stats level) — the
+    caller must then start UPWARD-STATS.md over instead of appending to it."""
+    try:
+        with open(cache_path(cwd)) as f:
+            c = json.load(f)
+    except Exception:
+        c = None
+    if not isinstance(c, dict) or c.get("transcript_path") != transcript_path or c.get("level") != level:
+        return empty_cache(transcript_path, level), True
+    return c, False
+
+
+def save_cache(cwd, cache):
+    try:
+        with open(cache_path(cwd), "w") as f:
+            json.dump(cache, f)
+    except Exception:
+        pass
+
+
 def call_usage(msg):
     usage = msg.get("usage") or {}
     return {
@@ -50,23 +98,69 @@ def call_usage(msg):
         "cache_write": usage.get("cache_creation_input_tokens", 0),
         "cache_read": usage.get("cache_read_input_tokens", 0),
         "fresh_input": usage.get("input_tokens", 0),
+        "desc": None,
     }
 
 
-def parse_transcript(path):
-    """Group the main transcript into tasks keyed by promptId. Each 'assistant'
-    JSONL line is one content block, not one API call — several lines can share
-    the same message.id (same call, split into thinking/text/tool_use blocks),
-    so usage is only counted once per unique message id."""
-    tasks = {}
-    order = []
-    current_pid = None
-    seen_msg_ids = set()
+def describe_block(block):
+    """One-line human description of an assistant content block: the command a
+    Bash call ran, the file an edit touched, etc. Returns (priority, text);
+    higher priority wins so a tool_use beats a preceding text/thinking block."""
+    t = block.get("type")
+    if t == "tool_use":
+        name = block.get("name", "tool")
+        inp = block.get("input") or {}
+        if name == "Bash":
+            key = inp.get("description") or inp.get("command")
+        elif name in ("Read", "Edit", "Write", "NotebookEdit"):
+            key = inp.get("file_path")
+            if key:
+                key = key.split("/")[-1]
+        elif name in ("Agent", "Task"):
+            key = inp.get("description")
+        elif name in ("Grep", "Glob"):
+            key = inp.get("pattern")
+        elif name == "Skill":
+            key = inp.get("skill")
+        elif name == "ToolSearch":
+            key = inp.get("query")
+        else:
+            key = (inp.get("description") or inp.get("command")
+                   or inp.get("file_path") or inp.get("pattern") or inp.get("query"))
+        text = f"{name}: {key}" if key else name
+        return 2, " ".join(str(text).split())[:60]
+    if t == "text":
+        text = " ".join((block.get("text") or "").split())
+        if text:
+            return 1, text[:60]
+    return 0, None
+
+
+def update_desc(call, content):
+    if not isinstance(content, list):
+        return
+    for block in content:
+        prio, text = describe_block(block)
+        if text and prio > call.get("_desc_prio", 0):
+            call["desc"] = text
+            call["_desc_prio"] = prio
+
+
+def parse_transcript_incremental(path, cache):
+    """Resume parsing the main transcript from cache["offset"], merging newly
+    seen lines into cache["tasks"]/["order"] in place. Each 'assistant' JSONL
+    line is one content block, not one API call — several lines can share the
+    same message.id, so usage is only counted once per unique message id."""
+    seen_msg_ids = set(cache["seen_msg_ids"])
+    tasks = cache["tasks"]
+    order = cache["order"]
+    current_pid = cache["current_pid"]
     try:
         fh = open(path)
     except Exception:
-        return []
+        return
     with fh:
+        fh.seek(cache["offset"])
         for line in fh:
             line = line.strip()
             if not line:
@@ -105,28 +199,41 @@ def parse_transcript(path):
                     continue
                 msg = d.get("message", {})
                 msg_id = msg.get("id")
+                calls = tasks[current_pid]["calls"]
+                if msg_id and msg_id in seen_msg_ids:
+                    if calls:
+                        update_desc(calls[-1], msg.get("content"))
+                    continue
                 if msg_id:
-                    if msg_id in seen_msg_ids:
-                        continue
                     seen_msg_ids.add(msg_id)
-                tasks[current_pid]["calls"].append(call_usage(msg))
-    result = []
-    for pid in order:
-        task = tasks[pid]
-        if not task["calls"]:
+                call = call_usage(msg)
+                update_desc(call, msg.get("content"))
+                calls.append(call)
+        cache["offset"] = fh.tell()
+    cache["current_pid"] = current_pid
+    cache["seen_msg_ids"] = list(seen_msg_ids)
+
+
+def collect_new_main_tasks(cache):
+    """A Stop event only fires once its whole turn (all promptIds seen so far
+    in this run) has finished, so every not-yet-emitted pid is safe to emit."""
+    new_tasks = []
+    for pid in cache["order"]:
+        if pid in cache["emitted_pids"]:
             continue
-        result.append({
-            "label": task["label"] or "(tool continuation)",
-            "calls": task["calls"],
-            "ts": task["ts"],
-        })
-    return result
+        task = cache["tasks"].get(pid)
+        if not task or not task["calls"]:
+            continue
+        new_tasks.append({"label": task["label"] or "(tool continuation)",
+                           "calls": task["calls"], "ts": task["ts"]})
+        cache["emitted_pids"].append(pid)
+    return new_tasks
 
 
 def aggregate_all_calls(path):
-    """Flatten every assistant call in a subagent transcript into one list —
-    subagent runs are reported as a single task row, not split by internal
-    prompt turns."""
+    """Full one-shot parse of a subagent transcript into a flat call list —
+    only called once per subagent file, when process_subagents has decided
+    it's finished (see below)."""
     calls = []
     seen = set()
     ts = None
@@ -149,20 +256,43 @@ def aggregate_all_calls(path):
                 continue
             msg = d.get("message", {})
             msg_id = msg.get("id")
+            if msg_id and msg_id in seen:
+                if calls:
+                    update_desc(calls[-1], msg.get("content"))
+                continue
             if msg_id:
-                if msg_id in seen:
-                    continue
                 seen.add(msg_id)
-            calls.append(call_usage(msg))
+            call = call_usage(msg)
+            update_desc(call, msg.get("content"))
+            calls.append(call)
     return calls, ts
 
 
-def collect_subagent_tasks(session_dir):
+def process_subagents(session_dir, cache):
+    """A subagent's row is only emitted once its jsonl file's size is
+    unchanged from the previous Stop event — proof it's done writing.
+    ponytail: a background agent that's still growing gets skipped this turn
+    and picked up whole+accurate on a later one, rather than emitted early
+    with a count that can never be corrected."""
     subdir = os.path.join(session_dir, "subagents")
     if not os.path.isdir(subdir):
         return []
-    tasks = []
+    new_tasks = []
+    cache_sub = cache["subagents"]
     for jsonl_path in sorted(glob.glob(os.path.join(subdir, "*.jsonl"))):
+        try:
+            size = os.path.getsize(jsonl_path)
+        except OSError:
+            continue
+        entry = cache_sub.get(jsonl_path)
+        if entry and entry.get("emitted"):
+            continue
+        if entry is None:
+            cache_sub[jsonl_path] = {"size": size, "emitted": False}
+            continue
+        if entry["size"] != size:
+            entry["size"] = size
+            continue
         meta_path = os.path.splitext(jsonl_path)[0] + ".meta.json"
         desc = agent_type = None
         try:
@@ -173,11 +303,12 @@ def collect_subagent_tasks(session_dir):
         except Exception:
             pass
         calls, ts = aggregate_all_calls(jsonl_path)
+        entry["emitted"] = True
         if not calls:
             continue
         label = f"[agent] {desc or agent_type or os.path.basename(jsonl_path)}"
-        tasks.append({"label": label, "calls": calls, "ts": ts})
-    return tasks
+        new_tasks.append({"label": label, "calls": calls, "ts": ts})
+    return new_tasks
 
 
 def summarize(calls):
@@ -203,11 +334,15 @@ def fmt(n):
     return f"{n:,}"
 
 
-def render_table(tasks, level):
+def header_cells(level):
     header = ["task", "subtask", "calls", "output", "cache write", "cache read", "fresh input"]
     if level == "call":
         header.append("model")
-    lines = ["| " + " | ".join(header) + " |", "|" + "---|" * len(header)]
+    return header
+
+
+def render_rows(tasks, level):
+    lines = []
 
     def row(task_label, subtask, s, model=None):
         cells = [task_label, subtask, fmt(s["calls"]), fmt(s["output"]),
@@ -221,8 +356,32 @@ def render_table(tasks, level):
         row(task["label"], "-", total, models_label(task["calls"]) if level == "call" else None)
         if level == "call":
             for i, c in enumerate(task["calls"], 1):
-                row(task["label"], f"call {i}", summarize([c]), c["model"])
-    return "\n".join(lines)
+                subtask = c.get("desc") or f"call {i}"
+                row(task["label"], f"{i}. {subtask}", summarize([c]), c["model"])
+    return lines
+
+
+def write_new_file(path, session_id, level, rows):
+    header = header_cells(level)
+    lines = [
+        "# Upward Stats",
+        "",
+        f"Session: `{session_id}` · Level: `{level}` · "
+        f"Started: {datetime.now(timezone.utc).isoformat(timespec='seconds')}",
+        "",
+        "| " + " | ".join(header) + " |",
+        "|" + "---|" * len(header),
+    ]
+    lines.extend(rows)
+    with open(path, "w") as f:
+        f.write("\n".join(lines) + "\n")
+
+
+def append_rows(path, rows):
+    if not rows:
+        return
+    with open(path, "a") as f:
+        f.write("\n".join(rows) + "\n")
 
 
 def main():
@@ -240,30 +399,30 @@ def main():
     if not transcript_path or not os.path.isfile(transcript_path):
         return
 
-    main_tasks = parse_transcript(transcript_path)
+    cache, reset = load_cache(cwd, transcript_path, level)
+    parse_transcript_incremental(transcript_path, cache)
+
+    new_tasks = collect_new_main_tasks(cache)
     session_dir = os.path.splitext(transcript_path)[0]
-    subagent_tasks = collect_subagent_tasks(session_dir)
+    new_tasks += process_subagents(session_dir, cache)
+    new_tasks.sort(key=lambda task: task.get("ts") or "")
 
-    all_tasks = main_tasks + subagent_tasks
-    all_tasks.sort(key=lambda task: task.get("ts") or "")
-    if not all_tasks:
-        return
+    out_path = stats_path(cwd)
+    if reset and os.path.exists(out_path):
+        try:
+            os.remove(out_path)
+        except Exception:
+            pass
 
-    session_id = os.path.basename(session_dir)
-    table = render_table(all_tasks, level)
-    content = (
-        "# Upward Stats\n\n"
-        f"Session: `{session_id}` · Level: `{level}` · "
-        f"Updated: {datetime.now(timezone.utc).isoformat(timespec='seconds')}\n\n"
-        f"{table}\n"
-    )
+    if new_tasks:
+        session_id = os.path.basename(session_dir)
+        rows = render_rows(new_tasks, level)
+        if not os.path.exists(out_path):
+            write_new_file(out_path, session_id, level, rows)
+        else:
+            append_rows(out_path, rows)
 
-    out_path = os.path.join(cwd, "UPWARD-STATS.md")
-    try:
-        with open(out_path, "w") as f:
-            f.write(content)
-    except Exception:
-        pass
+    save_cache(cwd, cache)
 
 
 if __name__ == "__main__":

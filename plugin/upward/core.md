@@ -19,6 +19,7 @@ Everything else loads on demand. These two don't, because they gate *when* you r
 - Anything written to a persisted artifact — docs, commits, code — gets written in full, normal sentences. Compressed or terse speech is for conversational replies only; it must never leak into anything saved.
 - Always verify model names, parameters, and prices before writing them down. Can't verify it? Mark it UNVERIFIED. Never fabricate from training memory.
 - Before editing an existing operating-rule file or config, commit to git first so you have a rollback point (no git yet? `git init` first).
+- Don't read or grep `UPWARD-STATS.md` during a general context search (repo scans, "find where X is," codebase exploration) — it's a generated token-usage log, not project content. Only open it when the user's current task explicitly asks about token usage, cost, or stats.
 
 ## Where the details live (call the matching skill via the Skill tool)
 
