@@ -1,7 +1,6 @@
 ---
 name: upward-stats
 description: Turn per-prompt/per-call token usage tracking on or off, written to .upward/UPWARD-STATS.md. Use when the user runs "/upward-stats on", "/upward-stats off", "/upward-stats level task", or "/upward-stats level call".
-model: haiku
 ---
 # upward-stats: toggle token-usage tracking
 
