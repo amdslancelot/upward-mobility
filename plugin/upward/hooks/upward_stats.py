@@ -173,6 +173,39 @@ def update_desc(call, content):
             call["_desc_prio"] = prio
 
 
+def collect_skills(content, into):
+    """Append the name of every Skill tool_use block in `content` to `into`.
+    Tracked separately from the per-call description because several tool_use
+    blocks can share one API call, and the description keeps only the first —
+    a Skill load batched with another tool call would otherwise go unrecorded."""
+    if not isinstance(content, list):
+        return
+    for block in content:
+        if isinstance(block, dict) and block.get("type") == "tool_use" and block.get("name") == "Skill":
+            name = (block.get("input") or {}).get("skill")
+            if name:
+                into.append(str(name))
+
+
+def skill_injected_estimate(name):
+    """Approximate token cost of a skill's SKILL.md landing in context, for
+    skills that ship with this plugin (resolved relative to this hook file).
+    Returns a short label fragment; the ~len/4 heuristic is an estimate and is
+    marked as such. Unknown skills return 'size unknown'."""
+    here = os.path.dirname(os.path.abspath(__file__))
+    if name == "core.md":
+        path = os.path.join(here, "..", "core.md")
+    else:
+        short = name.split(":")[-1]
+        path = os.path.join(here, "..", "skills", short, "SKILL.md")
+    try:
+        with open(path) as f:
+            n = len(f.read()) // 4
+        return f"~{n:,} tok injected"
+    except Exception:
+        return "size unknown"
+
+
 def parse_transcript_incremental(path, cache):
     """Resume parsing the main transcript from cache["offset"], merging newly
     seen lines into cache["tasks"]/["order"] in place. Each 'assistant' JSONL
@@ -227,6 +260,7 @@ def parse_transcript_incremental(path, cache):
                 msg = d.get("message", {})
                 msg_id = msg.get("id")
                 calls = tasks[current_pid]["calls"]
+                collect_skills(msg.get("content"), tasks[current_pid].setdefault("skills", []))
                 if msg_id and msg_id in seen_msg_ids:
                     if calls:
                         update_desc(calls[-1], msg.get("content"))
@@ -252,7 +286,8 @@ def collect_new_main_tasks(cache):
         if not task or not task["calls"]:
             continue
         new_tasks.append({"label": task["label"] or "(tool continuation)",
-                           "calls": task["calls"], "ts": task["ts"]})
+                           "calls": task["calls"], "ts": task["ts"],
+                           "skills": task.get("skills", [])})
         cache["emitted_pids"].append(pid)
     return new_tasks
 
@@ -378,6 +413,7 @@ def render_rows(tasks, level):
             cells.append(model or "")
         lines.append("| " + " | ".join(esc(c) for c in cells) + " |")
 
+    zero = {"calls": 0, "output": 0, "cache_write": 0, "cache_read": 0, "fresh_input": 0}
     for task in tasks:
         total = summarize(task["calls"])
         row(task["label"], "-", total, models_label(task["calls"]) if level == "call" else None)
@@ -385,6 +421,13 @@ def render_rows(tasks, level):
             for i, c in enumerate(task["calls"], 1):
                 subtask = c.get("desc") or f"call {i}"
                 row(task["label"], f"{i}. {subtask}", summarize([c]), c["model"])
+        # One informational row per Skill load, at both levels. Token columns
+        # stay zero on purpose: the injected content is already inside the
+        # following call's cache write, so putting an amount here would double
+        # count — the size estimate travels in the label instead.
+        for name in task.get("skills", []):
+            row(task["label"], f"[skill] {name} ({skill_injected_estimate(name)})",
+                zero, "-" if level == "call" else None)
     return lines
 
 
@@ -440,17 +483,35 @@ def main():
     new_tasks.sort(key=lambda task: task.get("ts") or "")
 
     out_path = stats_path(cwd)
+    session_id = os.path.basename(session_dir)
     if reset and os.path.exists(out_path):
+        # Starting over. If the existing file belongs to a DIFFERENT session,
+        # it is someone else's data (e.g. this session's shell wandered into a
+        # directory holding a finished benchmark run's stats) — archive it
+        # aside instead of destroying it. Only a same-session reset (the user
+        # flipped /upward-stats level) discards the file.
         try:
-            os.remove(out_path)
+            with open(out_path) as f:
+                head = f.read(2000)
+            m = re.search(r"Session: `([^`]+)`", head)
+            old_session = m.group(1) if m else None
+            if old_session and old_session != session_id:
+                os.replace(out_path, os.path.join(
+                    upward_dir(cwd), f"UPWARD-STATS-{old_session[:8]}.md"))
+            else:
+                os.remove(out_path)
         except Exception:
             pass
 
     if new_tasks:
-        session_id = os.path.basename(session_dir)
         rows = render_rows(new_tasks, level)
         if not os.path.exists(out_path):
-            write_new_file(out_path, session_id, level, rows)
+            # First write of a session also records the always-on injection:
+            # core.md enters context at every SessionStart, before any task.
+            zero = ["0"] * 5 + (["-"] if level == "call" else [])
+            core_row = ("| (session start) | [skill] core.md "
+                        f"({skill_injected_estimate('core.md')}) | " + " | ".join(zero) + " |")
+            write_new_file(out_path, session_id, level, [core_row] + rows)
         else:
             append_rows(out_path, rows)
 
