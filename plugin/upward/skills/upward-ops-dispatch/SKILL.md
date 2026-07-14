@@ -1,10 +1,10 @@
 ---
 name: upward-ops-dispatch
-description: Delegation rules and prompt templates — the sole "how to hand this off" authority for any task, including reviews. Covers the tiered dispatch cheat sheet (mechanical retrieval / bounded execution / judgment-heavy), the three required elements of a delegation brief, how to dispatch a review task specifically (which tool per review type, fresh-context rationale, model selection, required prompt structure), and six copy-paste prompt templates for search/implementation/refactor/research/review/file-append tasks. (When to escalate the model and the escalation ladder mechanics live in `upward-ops-judge`; judging a completed task's quality lives in `upward-ops-review`.) Use before delegating any task to a subagent.
+description: Delegation rules and prompt templates — how to hand a task off once you've decided dispatching pays (fresh-context reviews, genuinely parallel workstreams, bulk ingestion), the sole "how to hand this off" authority for any task, including reviews. Covers the tiered dispatch cheat sheet (mechanical retrieval / bounded execution / judgment-heavy), the three required elements of a delegation brief, how to dispatch a review task specifically (which tool per review type, fresh-context rationale, model selection, required prompt structure), and six copy-paste prompt templates for search/implementation/refactor/research/review/file-append tasks. (When to escalate the model and the escalation ladder mechanics live in `upward-ops-judge`; judging a completed task's quality lives in `upward-ops-review`.) Use before delegating any task to a subagent.
 ---
 # Model Dispatch Rules
 
-> Reader: the main-thread model, any tier. Goal: keep the cheap model running the day-to-day, and spend the pricier model's tokens only on judgment calls.
+> Reader: the main-thread model, any tier. Goal: when a task does leave the main thread, hand it off so the result comes back checkable, at the cheapest tier that can actually do it.
 
 ## Verified resources (verified 2026-07-07 against official docs — stale? re-verify and re-stamp before use)
 
@@ -13,9 +13,15 @@ description: Delegation rules and prompt templates — the sole "how to hand thi
 - Effort: the Agent tool call itself has no effort parameter; effort can only be set as `effort: low|medium|high|xhigh|max` in `.claude/agents/*.md` frontmatter.
 - Agent types available may vary by environment (some ship specialized investigator/builder/reviewer agents with compressed output that saves main-thread context). Check what's actually installed before naming one; fall back to Explore / general-purpose otherwise.
 
-## Hard rule: the commander doesn't descend
+## When dispatching pays (and when it doesn't)
 
-The main thread doesn't do: bulk file reading, repo scans, web lookups, batch edits, verification runs (one narrow exception: a grep/wc-level mechanical check confirming a just-applied fix landed — see `upward-ops-review` §3). All of that goes to a subagent — the main thread only receives the conclusion. The main thread's job is: break down the task, make the calls, synthesize conclusions, talk to the user.
+The default executor is the warm main context: doing the work yourself in one continuous context measured both cheaper and higher-quality than fanning task items out to fresh subagents, because every dispatch re-pays a cold-start (the subagent re-reads the plan, the contract, the tree from zero) and a cheaper builder model ends up writing the code the run gets graded on. Dispatch when one of three things is true:
+
+1. **A fresh context is the point** — the end-of-run consumer-seat review, a read-back, a second opinion. Independence is the product, and it cannot be produced inside the context that did the work.
+2. **The workstreams are genuinely parallel and independent** — no shared files, no ordering between them; the wall-clock win pays for the cold-starts.
+3. **The raw material would flood the main context** — bulk file ingestion, long log trawls, wide repo scans; the subagent reads a lot and reports back a little.
+
+Everything else stays in the main thread. Prefer foreground dispatch: every background dispatch wakes the main thread again with a paid notification round, and those wake-ups alone have been measured at a quarter of a run's raw token bill.
 
 ## Dispatch cheat sheet
 
@@ -25,11 +31,11 @@ Pick the tier with one question: is the answer already there to be found (Tier 1
 |---|---|---|---|---|---|
 | **1 — Mechanical retrieval** | The answer already exists — in the repo, in the text you hand it, or as a fixed set of categories; the task is locating, extracting, classifying, or restating it, with no judgment call to make. | Find a definition, call site, or file location; read-back verification of a file (does it exist, does it cover X/Y/Z, any broken sentences); quick factual Q&A answerable straight from given context; pulling specific fields out of text (error codes, dates, names); simple summarization of a file or report; high-volume classification/tagging against a fixed category set. | Explore for repo lookups; for verification, a freshly spawned general-purpose; otherwise often no dispatch needed at all — answer inline if it's already sitting in context (see cost intuition below) | haiku | One right answer either way — retrieval or classification against fixed rules — so the cheapest model gets there as reliably as any, and cheaply enough to run at volume. |
 | **2 — Bounded execution** | The goal is fixed and decidable, but reaching it takes comprehension or picking a path. | Broad search when you're not sure where to look; mechanical edit in 1-2 files; cross-file implementation or new feature; diff review; verifying the meaning (not just the form) of someone else's output. | Explore for searches; general-purpose for everything else | sonnet | Sonnet reasons well enough to pick a path and execute it correctly, at a fraction of opus's cost. |
-| **3 — Judgment-heavy** | The goal or shape of the work is itself the question; quality hinges on trade-offs and framing, not execution. | Architectural trade-offs; breaking down ambiguous requirements; choosing between competing designs. | Main thread makes the call directly (the judgment only — any build/test execution attached to it still gets dispatched), or Plan agent | opus | This is exactly where a cheaper model tanks quality, so opus tokens buy the most here. |
+| **3 — Judgment-heavy** | The goal or shape of the work is itself the question; quality hinges on trade-offs and framing, not execution. | Architectural trade-offs; breaking down ambiguous requirements; choosing between competing designs. | Main thread makes the call directly, or Plan agent | opus | This is exactly where a cheaper model tanks quality, so opus tokens buy the most here. |
 
 Two rules that cut across the tiers:
 
-- Verification always goes to a freshly spawned agent, never the one that did the work (concrete recipes in `upward-ops-review skill`#2). Tier it by what is being checked: form is Tier 1 (haiku), meaning is Tier 2 (sonnet).
+- Independent review — the end-of-run consumer-seat pass, a read-back, a second opinion — always goes to a freshly spawned agent, never anyone who touched the work (concrete recipes in `upward-ops-review skill`#2). Tier it by what is being checked: form is Tier 1 (haiku), meaning is Tier 2 (sonnet).
 - When a task straddles two tiers, split it: send the judgment part up (Tier 3) and the execution part down (Tier 2), rather than sending the whole thing to the expensive model.
 
 ## The three required elements of a delegation brief (every dispatch needs all three, or don't dispatch)
@@ -61,7 +67,7 @@ The principle itself is one of this plugin's two always-on reflexes (see `core.m
 | Over-engineering | Abstractions/dependencies that shouldn't exist | general-purpose agent with that focus explicitly stated in the prompt |
 | Document consistency | Cross-file contradictions, placeholders, broken cross-references, ambiguous sentences a weaker model would misread | general-purpose agent + template #5 below |
 | Mechanical read-back | Does the file exist? Is the content complete? Are sentences unbroken? | general-purpose agent, Haiku is enough |
-| Reality check (consumer-seat smoke) | Does the artifact work when used the way its real consumer uses it — boot it, deploy it, feed it a real input | general-purpose agent that actually runs the artifact; a real run is required, "it builds" doesn't qualify |
+| Reality check (consumer-seat smoke) | Does the artifact work when used the way its real consumer uses it — boot it, deploy it, feed it a real input, run any repeatable path twice | general-purpose agent that actually runs the artifact; a real run is required, "it builds" doesn't qualify — but it does not re-run install/build/test gates the worker already logged with execution evidence |
 
 The rubric in one line: **use a diff tool to review a diff, use general-purpose with custom-defined checks to review content.** A specialized tool's field of view is hardcoded — any risk outside that view, it stays silent on. Silence isn't the same as "no problem."
 
@@ -99,7 +105,7 @@ Once the review runs and findings come back, judging and acting on them is `upwa
 
 Don't trust a stamped token figure — cold-start cost depends entirely on what's actually loaded in the *current* environment (standing plugin/hook injections at session start, the system prompt, any skill files a task pulls in), and that shifts as the environment changes. Estimate it yourself instead: check what showed up in the first API call of a session log, sum it, and treat that as your fixed-cost floor before dispatching.
 
-- The deciding factor is the task's **number of execution rounds**, not its difficulty: ≥3-4 rounds of tool calls, or it needs to ingest a lot of raw material → dispatch, it's worth it. The answer is already sitting in the main thread's context and it's a one-line question → don't dispatch, just answer it.
+- The deciding factor is whether one of the three dispatch cases applies (fresh context as the product, real parallelism, bulk ingestion) — not the task's difficulty or length. A task you would execute serially in this context anyway does not get cheaper by moving to a subagent: the warm context already has the plan and the tree loaded, and the subagent pays to reload them. The answer is already sitting in the main thread's context and it's a one-line question → don't dispatch, just answer it.
 - Reviewing a batch of documents typically costs noticeably more than a normal dispatch — a semantic pass needs more reasoning rounds than a mechanical read-back does. Always worth it for output meant to stick around long-term; for one-off intermediate artifacts, it's fine to skip depending on context (see `upward-ops-plan skill`'s "when to use this" section for the rubric).
 - Write the delegation prompt with the full background it needs — don't make it re-discover things you already know.
 - Don't spin up a new agent for every small follow-up question in a row: continue the same agent with SendMessage (keeps context, saves the cold-start cost).
@@ -129,10 +135,10 @@ Acceptance criteria: every finding comes with file:line; if nothing's found, lis
 Report format: a file:line table, one sentence of explanation per row, total length ≤ 40 lines. Do not suggest fixes.
 ```
 
-## 2. Implementation (general-purpose/builder, sonnet)
+## 2. Implementation (general-purpose — or an installed builder agent type if one exists, sonnet)
 
 ```
-Background: [repo + feature context]. Relevant files: [file list + one-sentence function for each] (you — the subagent taking this task — read these fully before touching anything; the commander doesn't need to read them first).
+Background: [repo + feature context]. Relevant files: [file list + one-sentence function for each] (you — the subagent taking this task — read these fully before touching anything).
 Task: [the behavior to implement, including inputs/outputs/edge cases].
 Scope: expected to touch [file list]. If a new file is needed, explain why in the report. Do not touch [exclusion list].
 Conventions: follow the naming and style of the surrounding code; don't add new dependencies; don't do out-of-scope refactoring.
@@ -176,7 +182,7 @@ Report format: a findings list sorted by severity; 0 findings → explicitly sta
 Special focus: [risk points specific to this task]
 ```
 
-## 6. Appending/pasting content into a file (builder, haiku)
+## 6. Appending/pasting content into a file (general-purpose — or an installed builder agent type if one exists, haiku)
 
 ```
 Task: append content to the end of [file path] (currently [N] lines).
@@ -195,6 +201,6 @@ Report format: start and end line numbers of the appended content + PASS/FAIL fo
 
 ## Main thread's obligations after dispatching
 
-- When a report comes back, check it against the acceptance criteria item by item before accepting it. Checking means reading the report's execution evidence — not re-running the builder's gates yourself; the single fresh-context hunt-pass review at the end of the run (see `upward-ops-review`) is the only actor that re-executes them. If the report doesn't pass, handle it per `upward-ops-judge skill`#1 (when and how far to escalate).
+- When a report comes back, check it against the acceptance criteria item by item before accepting it. Checking means reading the report's execution evidence against the criteria — the end-of-run consumer-seat review (see `upward-ops-review`) remains the only independent pass over the finished work. If the report doesn't pass, handle it per `upward-ops-judge skill`#1 (when and how far to escalate).
 - If line numbers/figures in the report look inconsistent, the main thread must read the file itself to verify before reporting to the user.
 - When relaying a report's conclusions to the user, restate them in full sentences — don't paste the subagent's compressed output verbatim.
