@@ -1,6 +1,6 @@
 ---
 name: upward-debug
-description: Signal-first debugging loop. Standalone tool, usable with or without the plan/dispatch/review/judge loop. Use this when something is broken, throwing, failing, or slow and the cause is unknown — build a pass/fail signal that goes red on this specific bug before touching any code, then iterate hypothesis → minimal change → re-run signal, under nested round budgets that guarantee the loop terminates. Includes the environment/dependency checklist with its evidence gate, and the debug delegation template. Use when debugging a bug, a failing test, an error, a performance regression, or a fix that should work but does not take effect.
+description: Signal-first debugging loop: build a pass/fail signal that goes red on the bug before touching code. Use when something is broken, failing, or slow with an unknown cause, or a fix will not take.
 ---
 # Signal-First Debugging Loop
 

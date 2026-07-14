@@ -20,9 +20,9 @@ Everything else loads on demand. This one doesn't, because it gates *when* you r
 
 ## Where the details live (call the matching skill via the Skill tool)
 
-- Starting a large multi-output/multi-step task, or one that'll take half a day or more → `upward-ops-plan`.
+- Starting a large multi-output/multi-step task, one that'll take half a day or more, or output meant to stick around long-term → `upward-ops-plan`.
 - About to dispatch anything to a subagent — agent type/model/tier, the delegation brief, prompt templates, including how to dispatch a review → `upward-ops-dispatch`. (The escalation ladder lives in `upward-ops-judge`.)
 - Checking whether a completed task is actually done and good enough — quality floor by artifact type, findings triage → `upward-ops-review`.
 - Something is broken, throwing, failing, or slow and the cause is unknown, or a fix that should work won't take → `upward-debug` (build the pass/fail signal before touching code; includes the environment checklist).
 - Stuck, considering escalation, hitting a signal the direction is wrong, unsure whether to stop and ask the user, or facing a taste/ambiguous judgment call → `upward-ops-judge`.
-- Session losing focus, context bloating, unsure when to `/compact` vs `/clear` → `upward-harness-diagnose`.
+- Session losing focus or context bloating, unsure when to `/compact` vs `/clear` → `upward-harness-diagnose`.

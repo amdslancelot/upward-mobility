@@ -1,6 +1,6 @@
 ---
 name: upward-harness-diagnose
-description: Harness diagnosis and context management. Standalone tool, usable with or without the plan/dispatch/review/judge loop. Use this when a session loses focus or context blows up — covers the behavior patterns that leak the most tokens and how to fix them, plus the criteria for /compact vs /clear. Use when the session loses focus, context bloats, or you are deciding between /compact and /clear. (Debugging the project itself, including environment/dependency causes, lives in upward-debug.)
+description: Context management and harness diagnosis. Use when a session loses focus, context bloats, or you are deciding between /compact and /clear.
 ---
 # Harness diagnosis: where this harness leaks the most tokens and loses focus fastest
 

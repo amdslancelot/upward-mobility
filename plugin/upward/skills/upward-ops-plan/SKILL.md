@@ -1,16 +1,12 @@
 ---
 name: upward-ops-plan
-description: Turning a large task into a frozen plan.md — brief (goal, acceptance criteria, assumptions, risks) plus a task list with decidable acceptance criteria per item — and then driving the execution workflow that follows it: the main context executes the items itself and runs each item's gate once, loads `upward-ops-dispatch` (before the first dispatch), `upward-debug`/`upward-ops-judge` (when blocked), and `upward-ops-review` (after the last item) via the Skill tool as mandatory steps, and closes with exactly one fresh-context consumer-seat review. Use this when starting a task with multiple deliverables, multiple steps, half a day or more of work, or output meant to stick around long-term; skip for single-file or one-off work.
+description: Brief plus frozen plan.md, then the execution workflow: the main context builds and gates everything itself, closing with one fresh-context consumer-seat review. Use for multi-step or long-lived work; skip for one-offs.
 ---
 
 # The Brief and the Plan (self-applied by the model)
 
 > Reader: the main-thread model. This covers phase 0 (brief) and phase 1 (plan) of a large task — turning it into a frozen `plan.md` before any execution starts. Execution follows the workflow at the end of this file (you do it yourself, in this context); review and escalation are their own skills' jobs — see "Once plan.md is frozen" below.
-> See the last section for when to use this; skip it for small tasks (the fixed overhead of writing a brief and a plan eats the benefit).
-
-## The problem this solves
-
-A Sonnet-tier commander defaults to "I'll just start working": it won't spontaneously write a task list, and it won't confirm direction before diving in. Both failures happen before a single line of execution — the most expensive mistake is flawless execution in the wrong direction, which is exactly why phase 0's brief can't be skipped.
+> Use this for tasks with multiple deliverables, half a day or more of work, or output meant to stick around long-term. Skip it for a small single-file edit or a one-off draft — the fixed overhead of a brief and a plan eats the benefit; do the work plus a lightweight check instead (output that will be kept still gets a fresh-context review; one-off intermediates may skip it).
 
 ## plan.md template (create before starting work, maintain throughout)
 
@@ -70,23 +66,3 @@ Planning stops here. The rest of the run follows the loop below. The Skill-tool 
 5. **When findings come back**: triage each one per `upward-ops-review`, apply accepted fixes yourself in this context, re-run only the specific gate each finding names, log the revision, and commit the checkpoint.
 
 Save progress in plan.md as you go — one line per checkpoint, and a revision log that records finding → fix, not narrative. If the session is interactive, tell the user `plan.md` is frozen and wait for a go before executing item 1; in an autonomous run with no user to ask, proceed directly into the workflow above.
-
-## What each design choice guards against in a weaker model
-
-| Design | Guards against |
-|---|---|
-| Pin the brief first + stop when direction is uncertain | Getting the first cut wrong — the biggest gap in a weaker commander |
-| Assumptions written into their own field | A rollback point when things break: check whether an earlier assumption was wrong, instead of staring at the line that threw the error |
-| Plan frozen into plan.md | An anchor against mid-task drift; survives `/compact` |
-| Criteria grounded in primary artifacts before freezing | The plan inheriting the planner's own misunderstanding — criteria written from a wrong belief verify the belief, not the work |
-| Unverified assumptions produce tolerant code | A wrong belief with a "verified" stamp shipping as a strict validator that hard-fails on every real input |
-| Consumer-seat reality check as the mandatory last task, run by the fresh-context reviewer | Goodharting: every checklist box green while the artifact fails on its first real use — and the plan's author grading their own exam |
-| Skill loads written into the workflow as numbered steps | The execution-stage safeguards silently never entering the session — prose references load nothing |
-| The main context executes items itself; subagents are read-only; one scoped reviewer is the only independent pass | Token burn from per-item subagent cold-starts and from gates being re-run by extra actors; quality loss from a cheaper builder model writing the shipped code; contract drift between parallel builders, whose fatal defects land at the seams between them |
-| Context hygiene written into the execution loop (batch calls, quiet green gates, digest research, no tracker) | The quadratic bill of a growing context re-read on every call: in one fully compliant measured run, carried research alone cost a third of total tokens, with single-probe calls, verbose gate logs, and tracker churn adding several more percent each |
-
-## When to use this, and when not to
-
-- **Use it**: tasks with multiple deliverables (half a day or more of work), output meant to stick around long-term (operating-rule files, external-facing docs, core code), or when the cost of a mistake exceeds the cost of one review round (see the cost-intuition section of `upward-ops-dispatch` skill for how to estimate that for your environment).
-- **Don't use it**: a small single-file edit, a one-off draft, a question whose answer is already sitting in the conversation — the fixed cost of a brief and a plan eats the benefit; just do the work plus a lightweight check instead.
-- **Scaled-down version (medium-sized, direction already clear)**: skip phase 0/1's back-and-forth entirely, but still dispatch a fresh-context review when the work is done (per `upward-ops-dispatch` skill) and work through every finding by fixing the source (per `upward-ops-review` skill) before reporting back.

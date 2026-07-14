@@ -1,6 +1,6 @@
 ---
 name: upward-ops-dispatch
-description: Delegation rules and prompt templates for the two dispatchable task kinds — fresh-context checks (reviews, read-backs, second opinions) and bulk read-and-report; subagents never write project files. The sole "how to hand this off" authority, including for reviews. Covers the tiered dispatch cheat sheet (mechanical retrieval / bounded comprehension / judgment-heavy), the three required elements of a delegation brief, how to dispatch a review task specifically (which tool per review type, fresh-context rationale, model selection, required prompt structure), and three copy-paste prompt templates for search/research/review tasks. (When to escalate the model and the escalation ladder mechanics live in `upward-ops-judge`; judging a completed task's quality lives in `upward-ops-review`.) Use before delegating any task to a subagent.
+description: How to dispatch read-only subagents: the two dispatchable kinds, the delegation brief, review dispatch, and prompt templates. Load before any dispatch.
 ---
 # Model Dispatch Rules
 
@@ -10,7 +10,6 @@ description: Delegation rules and prompt templates for the two dispatchable task
 
 - Model aliases: haiku / sonnet / opus / fable. Capability/cost ordering: haiku < sonnet < opus < fable. Which concrete version an alias resolves to varies by harness — check the `/model` picker, don't trust a written-down model ID.
 - The Agent tool's `model` parameter accepts the aliases above (confirmed in the sub-agents official docs).
-- Effort: the Agent tool call itself has no effort parameter; effort can only be set as `effort: low|medium|high|xhigh|max` in `.claude/agents/*.md` frontmatter.
 - Agent types available may vary by environment (some ship specialized investigator/reviewer agents with compressed output that saves main-thread context). Check what's actually installed before naming one; fall back to Explore / general-purpose otherwise.
 
 ## Dispatch is read-only
@@ -28,9 +27,9 @@ Pick the tier with one question: is the answer already there to be found (Tier 1
 
 | Tier | What belongs here | Examples | Agent type | Model | Why this model |
 |---|---|---|---|---|---|
-| **1 — Mechanical retrieval** | The answer already exists — in the repo, in the text you hand it, or as a fixed set of categories; the task is locating, extracting, classifying, or restating it, with no judgment call to make. | Find a definition, call site, or file location; read-back verification of a file (does it exist, does it cover X/Y/Z, any broken sentences); quick factual Q&A answerable straight from given context; pulling specific fields out of text (error codes, dates, names); simple summarization of a file or report; high-volume classification/tagging against a fixed category set. | Explore for repo lookups; for verification, a freshly spawned general-purpose; otherwise often no dispatch needed at all — answer inline if it's already sitting in context (see cost intuition below) | haiku | One right answer either way — retrieval or classification against fixed rules — so the cheapest model gets there as reliably as any, and cheaply enough to run at volume. |
-| **2 — Bounded comprehension** | The goal is fixed and decidable, but reaching it takes comprehension or picking a path through the material. | Broad search when you're not sure where to look; diff review; a long log or doc trawl that ends in a short summary; verifying the meaning (not just the form) of someone else's output; the consumer-seat reality check. | Explore for searches; general-purpose for everything else | sonnet | Sonnet reasons well enough to pick a path and follow it correctly, at a fraction of opus's cost. |
-| **3 — Judgment-heavy** | The goal or shape of the work is itself the question; quality hinges on trade-offs and framing, not execution. | Architectural trade-offs; breaking down ambiguous requirements; choosing between competing designs. | Main thread makes the call directly, or Plan agent | opus | This is exactly where a cheaper model tanks quality, so opus tokens buy the most here. |
+| **1 — Mechanical retrieval** | The answer already exists; the task is locating, extracting, or restating it, with no judgment call to make. | Find a definition or call site; read-back verification of a file (does it exist, does it cover X/Y/Z, any broken sentences); pulling specific fields out of text. | Explore for repo lookups; for verification, always a freshly spawned general-purpose. A lookup whose answer already sits in this context needs no dispatch — answer it inline (see cost intuition below) | haiku | One right answer either way, so the cheapest model gets there as reliably as any. |
+| **2 — Bounded comprehension** | The goal is fixed and decidable, but reaching it takes comprehension or picking a path through the material. | Broad search when you're not sure where to look; a long log or doc trawl that ends in a short summary; research fetches; the consumer-seat reality check. | Explore for searches; general-purpose for everything else | sonnet | Sonnet reasons well enough to pick a path and follow it correctly, at a fraction of opus's cost. |
+| **3 — Judgment-heavy** | The goal or shape of the work is itself the question. | Architectural trade-offs; ambiguous requirements. | Main thread makes the call directly, or a read-only Plan agent for a second opinion | opus | This is exactly where a cheaper model tanks quality. |
 
 Two rules that cut across the tiers:
 
@@ -58,17 +57,13 @@ The principle itself is one of this plugin's two always-on reflexes (see `core.m
 
 ## Dispatching a review task
 
-"Review" isn't one task, it's five. Pick the wrong tool and the review looks done but doesn't actually cover the risk:
+"Review" isn't one task. State the one focus explicitly in the prompt, because a reviewer only checks what it's pointed at. The common types are below; any other single focus (correctness of a diff, over-engineering, …) goes to a general-purpose agent with template #3 and that focus stated:
 
 | Review type | What it's checking | Correct tool |
 |---|---|---|
-| Diff/PR correctness | Does this change have bugs | general-purpose agent given the git diff and a correctness-only focus |
-| Over-engineering | Abstractions/dependencies that shouldn't exist | general-purpose agent with that focus explicitly stated in the prompt |
 | Document consistency | Cross-file contradictions, placeholders, broken cross-references, ambiguous sentences a weaker model would misread | general-purpose agent + template #3 below |
 | Mechanical read-back | Does the file exist? Is the content complete? Are sentences unbroken? | general-purpose agent, Haiku is enough |
 | Reality check (consumer-seat smoke) | Does the artifact work when used the way its real consumer uses it — boot it, deploy it, feed it a real input, run any repeatable path twice | general-purpose agent that actually runs the artifact; a real run is required, "it builds" doesn't qualify — but it does not re-run install/build/test gates the worker already logged with execution evidence |
-
-The rubric in one line: **use a diff tool to review a diff, use general-purpose with custom-defined checks to review content.** A specialized tool's field of view is hardcoded — any risk outside that view, it stays silent on. Silence isn't the same as "no problem."
 
 **Fresh-context isn't a formality, it's a test condition.** Reviews always spin up a new agent (never `SendMessage` to continue any prior agent), for two reasons:
 
@@ -83,10 +78,7 @@ Real example: one review caught "the README describes five templates, but there 
 - **Sonnet**: when a finding requires reasoning — "this sentence has two readings," "this number looks generic but is actually leftover project-specific cruft," "these two rules conflict in an edge case."
 - **Opus**: only when the thing under review is itself a high-stakes judgment call (architectural decisions, security boundaries) that needs a second opinion.
 
-The cost of picking wrong is asymmetric: Sonnet reviewing mechanical items costs about 1.5x more — a minor loss. Haiku reviewing semantic items comes back with a false-negative "all PASS," which guts the entire point of the review. **When unsure, round up.**
-
-Good: "do rules 3 and 7 contradict each other in an edge case?" → Sonnet; it needs reasoning.
-Bad: sending "do rules 3 and 7 contradict?" to Haiku → it returns "all PASS," the contradiction ships, and the review bought you nothing.
+The cost of picking wrong is asymmetric — Haiku on a semantic check returns a false-negative "all PASS" that guts the review, while Sonnet on a mechanical check merely costs a little more — so **when unsure, round up** (same rule as the cheat sheet above).
 
 **The required structure of a review prompt** (start from template #3 below, then add this):
 
@@ -105,9 +97,8 @@ Once the review runs and findings come back, judging and acting on them is `upwa
 Don't trust a stamped token figure — cold-start cost depends entirely on what's actually loaded in the *current* environment (standing plugin/hook injections at session start, the system prompt, any skill files a task pulls in), and that shifts as the environment changes. Estimate it yourself instead: check what showed up in the first API call of a session log, sum it, and treat that as your fixed-cost floor before dispatching.
 
 - The deciding factor is whether one of the two dispatch cases applies (fresh context as the product, bulk read-and-report) — not the task's difficulty or length. Work does not get cheaper by moving to a subagent: the warm context already has the plan and the tree loaded, and the subagent pays to reload them. The answer is already sitting in the main thread's context and it's a one-line question → don't dispatch, just answer it.
-- Reviewing a batch of documents typically costs noticeably more than a normal dispatch — a semantic pass needs more reasoning rounds than a mechanical read-back does. Always worth it for output meant to stick around long-term; for one-off intermediate artifacts, it's fine to skip depending on context (see `upward-ops-plan skill`'s "when to use this" section for the rubric).
+- Reviewing a batch of documents typically costs noticeably more than a normal dispatch — a semantic pass needs more reasoning rounds than a mechanical read-back does. Always worth it for output meant to stick around long-term; for one-off intermediate artifacts, it's fine to skip.
 - Write the delegation prompt with the full background it needs — don't make it re-discover things you already know.
-- Don't spin up a new agent for every small follow-up question in a row: continue the same agent with SendMessage (keeps context, saves the cold-start cost) — never for review agents, though; a review always starts fresh.
 
 # Delegation Prompt Templates
 
@@ -144,7 +135,7 @@ Acceptance criteria: every question has either "answer + source" or "UNVERIFIED 
 Report format: a fact list, ≤ 2 lines + URL per item. Long quotes get saved to [scratch path], report the path back.
 ```
 
-## 3. Review (reviewer/fresh-context, sonnet) — for type/model selection and prompt add-ons, see "Dispatching a review task" above
+## 3. Review (reviewer/fresh-context, sonnet) — for type/model selection and prompt add-ons, see "Dispatching a review task" above. The end-of-run consumer-seat pass counts as ONE focus: its boot-and-exercise half and its criteria-attack half travel in the same single dispatch, never two.
 
 ```
 Background: [what this diff/file is for]. Original request, verbatim: [paste the user's original request — the acceptance criteria below were authored inside this run and may themselves be wrong; checking them against the request and against reality is part of your job].

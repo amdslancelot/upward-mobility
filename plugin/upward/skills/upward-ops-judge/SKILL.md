@@ -1,6 +1,6 @@
 ---
 name: upward-ops-judge
-description: Judgment externalized as a rubric. Check here when stuck or unsure — when to escalate the model versus roll back and change course, when to stop and ask the user, and the honesty clause for ambiguous calls and taste judgments. (Task-done criteria and quality-floor verification live in `upward-ops-review`.) Use when stuck, considering escalation, deciding whether to change approach, or facing a judgment call a weaker model can't make alone.
+description: Externalized judgment: escalate the model vs roll back and change course, when to stop and ask the user, and taste calls. Use when stuck or unsure.
 ---
 # Judgment, externalized: rubric and checklist
 
