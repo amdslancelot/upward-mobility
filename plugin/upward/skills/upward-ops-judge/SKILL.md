@@ -18,14 +18,14 @@ Both branches of this section start the same way: a signal fired telling you tha
 - The task requires picking one option among several defensible ones, and picking wrong costs more than a full day's rework.
 - The task involves deletion, data migration, or a public release, and you can't say how you'd roll it back if it goes wrong.
 
-**How far to escalate**:
+**How far to escalate** (this ladder applies to dispatched tasks, which are read-only — searches, read-backs, reviews, research; subagents never write project files, so a failure in implementation work is handled in the main context via the change-course/rollback branch below, not by re-dispatching it):
 - **Haiku fails once** → escalate to sonnet, re-dispatch the same task with the error output attached.
 - **Sonnet fails twice on the same subtask** → escalate to opus with the full failure trace (both prompts and error outputs). Escalating without the trace is just re-rolling the dice.
-- **Once opus solves the pattern** → write the solution up as explicit steps and hand it back down to sonnet/haiku for batch application.
+- **Once opus cracks the pattern** → write the answer down (in plan.md or the report) so cheaper checks can reuse it; any edits that follow from it are applied by the main context, never handed to a subagent.
 - **Rule out environment/dependency root causes before escalating**: escalating the model doesn't fix a broken environment (version mismatch, stale build, missing dependencies) — that kind of root cause stumps opus just as much. For a stubborn error, run the environment checklist in `upward-debug skill` first, then decide whether escalation is even warranted.
 - **Retry the same thing at most two rounds** (escalation included). The third round isn't "keep trying" — it's changing course or asking the user (section 2 below).
 
-**Good**: Sonnet fails to hit the acceptance criteria twice in a row (e.g., needs <50ms error, only gets to 200ms) — bundle both traces and escalate to Opus. ✅
+**Good**: a Sonnet consistency reviewer twice returns findings that don't hold up against the file — bundle both reports and escalate the review to Opus. ✅
 **Bad**: escalating just because "this task feels hard," with no failure evidence behind it. ❌
 
 **Change course instead of retrying** when any of these signals fire — the direction is wrong, not the model:

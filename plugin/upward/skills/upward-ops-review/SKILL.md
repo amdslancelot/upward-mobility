@@ -4,7 +4,7 @@ description: How to judge whether a completed task is actually done and good eno
 ---
 # How to review task quality after a task is done
 
-> Audience: the main-conversation model. This answers "is this task actually finished, by what bar, and what do I do with the findings once I have them" — not "how do I dispatch the review" (that's `upward-ops-dispatch skill`, which now owns every "how to hand this off" question including review-shaped ones).
+> Audience: the main-conversation model. This answers "is this task actually finished, by what bar, and what do I do with the findings once I have them" — not "how do I dispatch the review" (that's `upward-ops-dispatch skill`, which owns every "how to hand this off" question including review-shaped ones).
 > If a review turns up something you can't resolve on your own — stuck, need to escalate the model, or it's a taste call only the user can make — see `upward-ops-judge`.
 
 ## 1. When a task actually counts as done
