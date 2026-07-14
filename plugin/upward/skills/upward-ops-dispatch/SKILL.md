@@ -15,7 +15,7 @@ description: Delegation rules and prompt templates — the sole "how to hand thi
 
 ## Hard rule: the commander doesn't descend
 
-The main thread doesn't do: bulk file reading, repo scans, web lookups, batch edits, verification runs. All of that goes to a subagent — the main thread only receives the conclusion. The main thread's job is: break down the task, make the calls, synthesize conclusions, talk to the user.
+The main thread doesn't do: bulk file reading, repo scans, web lookups, batch edits, verification runs (one narrow exception: a grep/wc-level mechanical check confirming a just-applied fix landed — see `upward-ops-review` §3). All of that goes to a subagent — the main thread only receives the conclusion. The main thread's job is: break down the task, make the calls, synthesize conclusions, talk to the user.
 
 ## Dispatch cheat sheet
 
@@ -25,7 +25,7 @@ Pick the tier with one question: is the answer already there to be found (Tier 1
 |---|---|---|---|---|---|
 | **1 — Mechanical retrieval** | The answer already exists — in the repo, in the text you hand it, or as a fixed set of categories; the task is locating, extracting, classifying, or restating it, with no judgment call to make. | Find a definition, call site, or file location; read-back verification of a file (does it exist, does it cover X/Y/Z, any broken sentences); quick factual Q&A answerable straight from given context; pulling specific fields out of text (error codes, dates, names); simple summarization of a file or report; high-volume classification/tagging against a fixed category set. | Explore for repo lookups; for verification, a freshly spawned general-purpose; otherwise often no dispatch needed at all — answer inline if it's already sitting in context (see cost intuition below) | haiku | One right answer either way — retrieval or classification against fixed rules — so the cheapest model gets there as reliably as any, and cheaply enough to run at volume. |
 | **2 — Bounded execution** | The goal is fixed and decidable, but reaching it takes comprehension or picking a path. | Broad search when you're not sure where to look; mechanical edit in 1-2 files; cross-file implementation or new feature; diff review; verifying the meaning (not just the form) of someone else's output. | Explore for searches; general-purpose for everything else | sonnet | Sonnet reasons well enough to pick a path and execute it correctly, at a fraction of opus's cost. |
-| **3 — Judgment-heavy** | The goal or shape of the work is itself the question; quality hinges on trade-offs and framing, not execution. | Architectural trade-offs; breaking down ambiguous requirements; choosing between competing designs. | Main thread does it directly, or Plan agent | opus | This is exactly where a cheaper model tanks quality, so opus tokens buy the most here. |
+| **3 — Judgment-heavy** | The goal or shape of the work is itself the question; quality hinges on trade-offs and framing, not execution. | Architectural trade-offs; breaking down ambiguous requirements; choosing between competing designs. | Main thread makes the call directly (the judgment only — any build/test execution attached to it still gets dispatched), or Plan agent | opus | This is exactly where a cheaper model tanks quality, so opus tokens buy the most here. |
 
 Two rules that cut across the tiers:
 
@@ -195,6 +195,6 @@ Report format: start and end line numbers of the appended content + PASS/FAIL fo
 
 ## Main thread's obligations after dispatching
 
-- When a report comes back, check it against the acceptance criteria item by item before accepting it. If it doesn't pass, handle it per `upward-ops-judge skill`#1 (when and how far to escalate).
+- When a report comes back, check it against the acceptance criteria item by item before accepting it. Checking means reading the report's execution evidence — not re-running the builder's gates yourself; the single fresh-context hunt-pass review at the end of the run (see `upward-ops-review`) is the only actor that re-executes them. If the report doesn't pass, handle it per `upward-ops-judge skill`#1 (when and how far to escalate).
 - If line numbers/figures in the report look inconsistent, the main thread must read the file itself to verify before reporting to the user.
 - When relaying a report's conclusions to the user, restate them in full sentences — don't paste the subagent's compressed output verbatim.
