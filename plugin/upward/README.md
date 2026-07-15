@@ -39,9 +39,9 @@ plugin/upward/
 ├── .claude-plugin/plugin.json   # plugin manifest
 ├── core.md                      # always-on rules, injected by the SessionStart hook
 ├── hooks/
-│   ├── hooks.json                # registers the SessionStart and Stop hooks
+│   ├── hooks.json                # registers the SessionStart, Stop, and SubagentStop hooks
 │   ├── activate.sh               # cats core.md to stdout on session start/resume/clear/compact
-│   └── upward_stats.py           # Stop hook: writes .upward/UPWARD-STATS.md when upward-stats is on
+│   └── upward_stats.py           # Stop/SubagentStop hook: writes .upward/UPWARD-STATS.md when upward-stats is on
 └── skills/
     ├── upward-ops-plan/         # brief → frozen plan.md for large tasks; hands off execution/review/escalation to the skills below
     ├── upward-ops-dispatch/     # how to pick agent type/model/tier, delegation prompt templates, escalation ladder, how to dispatch a review
@@ -58,7 +58,7 @@ The `SessionStart` hook (matches `startup`, `resume`, `clear`, `compact`) runs `
 
 None of the six skills above are injected automatically. The core rules tell the model which skill to invoke via the Skill tool for a given situation (e.g. "starting a multi-step task" → `upward-ops-plan`), so the detailed playbook only enters context when it's actually needed. Four of them (`upward-ops-plan`, `upward-ops-dispatch`, `upward-ops-review`, `upward-ops-judge`) form one operating loop — plan hands off to dispatch for execution, review checks the result, judge handles getting stuck — while `upward-debug` and `upward-harness-diagnose` are standalone tools usable with or without that loop, which is why their names drop the `-ops-` prefix.
 
-`upward-stats` is a standalone toggle, unrelated to the always-on core rules: `/upward-stats on` writes `.upward/stats-state.json` under the project root, and the plugin's `Stop` hook checks that file after every turn, appending token usage grouped by prompt (and by individual API call, including model, at `level call`) to `.upward/UPWARD-STATS.md`. `/upward-stats off` turns it back off. Everything lives inside the `.upward/` dot-directory so repo scans and glob patterns skip it by default; the directory is generated/local — add `.upward/` to your project's `.gitignore` if you don't want it tracked. (Older plugin versions wrote the three files at the project root; the hook migrates them into `.upward/` automatically.)
+`upward-stats` is a standalone toggle, unrelated to the always-on core rules: `/upward-stats on` writes `.upward/stats-state.json` under the project root, and the plugin's `Stop` hook checks that file after every turn, appending token usage grouped by prompt (and by individual API call, including model, at `level call`) to `.upward/UPWARD-STATS.md`. The same script also runs on `SubagentStop`, so a dispatched subagent's own token usage is recorded as an `[agent]` row even in a headless one-turn session, where `Stop` fires only once. `/upward-stats off` turns it back off. Everything lives inside the `.upward/` dot-directory so repo scans and glob patterns skip it by default; the directory is generated/local — add `.upward/` to your project's `.gitignore` if you don't want it tracked. (Older plugin versions wrote the three files at the project root; the hook migrates them into `.upward/` automatically.)
 
 ## Notes for adapting this to another project
 

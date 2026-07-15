@@ -1,14 +1,21 @@
 #!/usr/bin/env python3
-# upward-stats — Stop hook. Runs after every turn; no-op unless
-# .upward/stats-state.json (under the project root) has {"enabled": true}.
+# upward-stats — Stop and SubagentStop hook. Runs after every turn (and after
+# every finished subagent); no-op unless .upward/stats-state.json (under the
+# project root) has {"enabled": true}.
 # When enabled, resumes parsing the session transcript from where it left off
 # (byte offset cached in .upward/stats-cache.json) and appends only the rows
 # for newly-completed tasks to .upward/UPWARD-STATS.md — it never rereads the
 # whole transcript or rewrites the whole file. Everything lives in the .upward/
 # dot-directory so repo scans and glob patterns skip it by default. Subagent rows are held back until
-# their jsonl file's size is unchanged across two consecutive Stop events
+# their jsonl file's size is unchanged across two consecutive hook events
 # (i.e. the subagent has finished writing); this avoids emitting a row for a
 # still-running background agent and then never being able to fix the count.
+# SubagentStop events exist so those two sightings happen even in a headless
+# one-turn session, which fires Stop exactly once — without them a dispatch's
+# row would register but never emit. On SubagentStop the main-task rows are
+# NOT flushed: the main turn is still in flight at that moment, and a task row
+# is emitted only once per prompt, so flushing early would freeze a partial
+# count that no later event could correct.
 # Never raises past main() — a stats bug must not break the user's session.
 import glob
 import json
@@ -110,9 +117,15 @@ def load_cache(cwd, transcript_path, level):
 
 
 def save_cache(cwd, cache):
+    # Temp-file + rename so a concurrent reader can never see a half-written
+    # cache (a torn read parses as invalid, forces reset=True, and the
+    # same-session reset branch would delete UPWARD-STATS.md mid-session).
+    path = cache_path(cwd)
+    tmp = path + ".tmp"
     try:
-        with open(cache_path(cwd), "w") as f:
+        with open(tmp, "w") as f:
             json.dump(cache, f)
+        os.replace(tmp, path)
     except Exception:
         pass
 
@@ -216,13 +229,25 @@ def parse_transcript_incremental(path, cache):
     order = cache["order"]
     current_pid = cache["current_pid"]
     try:
-        fh = open(path)
+        fh = open(path, "rb")
     except Exception:
         return
     with fh:
+        # Binary mode with an explicit readline loop: a SubagentStop event can
+        # fire while the main turn is still appending to this file, so the
+        # last line may be a torn partial write. Only newline-terminated lines
+        # are consumed; an unterminated tail is left for the next event to
+        # re-read whole — advancing the offset past a fragment would silently
+        # lose the rest of that record (or a promptId) forever.
         fh.seek(cache["offset"])
-        for line in fh:
-            line = line.strip()
+        while True:
+            raw = fh.readline()
+            if not raw:
+                break
+            if not raw.endswith(b"\n"):
+                fh.seek(-len(raw), os.SEEK_CUR)
+                break
+            line = raw.decode("utf-8", "replace").strip()
             if not line:
                 continue
             try:
@@ -454,6 +479,22 @@ def append_rows(path, rows):
         f.write("\n".join(rows) + "\n")
 
 
+def acquire_lock(cwd):
+    """Exclusive advisory lock for the whole run of main(). Stop events never
+    overlap, but two SubagentStop events can fire near-simultaneously when
+    agents finish together — unserialized, both could read the parse cache
+    before either saves it and emit the same [agent] row twice. Returns the
+    open lock file handle (held until process exit) or None where flock isn't
+    available (Windows); the single-writer assumption then holds as before."""
+    try:
+        import fcntl
+        fh = open(os.path.join(upward_dir(cwd), ".lock"), "w")
+        fcntl.flock(fh, fcntl.LOCK_EX)
+        return fh
+    except Exception:
+        return None
+
+
 def main():
     hook_input = read_hook_input()
     cwd = hook_input.get("cwd") or os.getcwd()
@@ -467,6 +508,7 @@ def main():
         os.makedirs(upward_dir(cwd), exist_ok=True)
     except Exception:
         return
+    lock = acquire_lock(cwd)  # held (referenced) until main() returns
 
     transcript_path = hook_input.get("transcript_path")
     if not transcript_path or not os.path.isfile(transcript_path):
@@ -477,7 +519,11 @@ def main():
     cache, reset = load_cache(cwd, transcript_path, level)
     parse_transcript_incremental(transcript_path, cache)
 
-    new_tasks = collect_new_main_tasks(cache)
+    # On SubagentStop the main turn is still running: parse (cheap, keeps the
+    # offset current) but only flush main-task rows on Stop — a task row is
+    # emitted once per prompt, so an early flush would freeze a partial count.
+    on_subagent_stop = hook_input.get("hook_event_name") == "SubagentStop"
+    new_tasks = [] if on_subagent_stop else collect_new_main_tasks(cache)
     session_dir = os.path.splitext(transcript_path)[0]
     new_tasks += process_subagents(session_dir, cache)
     new_tasks.sort(key=lambda task: task.get("ts") or "")
