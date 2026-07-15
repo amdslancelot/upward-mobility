@@ -6,7 +6,7 @@ description: How to dispatch read-only subagents: the two dispatchable kinds, th
 
 > Reader: the main-thread model, any tier. Goal: when a task does leave the main thread, hand it off so the result comes back checkable, at the cheapest tier that can actually do it.
 
-## Verified resources (verified 2026-07-07 against official docs — stale? re-verify and re-stamp before use)
+## Verified resources (verified 2026-07-07 against official docs — stale? re-verify via a template #2 research dispatch and re-stamp before use)
 
 - Model aliases: haiku / sonnet / opus / fable. Capability/cost ordering: haiku < sonnet < opus < fable. Which concrete version an alias resolves to varies by harness — check the `/model` picker, don't trust a written-down model ID.
 - The Agent tool's `model` parameter accepts the aliases above (confirmed in the sub-agents official docs).
@@ -130,7 +130,7 @@ Report format: a file:line table, one sentence of explanation per row, total len
 ```
 Background: [the decision to be made] needs [what kind of facts] to back it up.
 Task: verify the following questions: [question list].
-Source requirements: prefer official docs/official repos; every fact needs a source URL; can't find it → mark UNVERIFIED, filling gaps from training memory is forbidden (especially for version numbers, API parameters, prices).
+Source requirements: primary sources only — official docs, official repos, real sample artifacts; every fact needs a source URL. A fact backed only by secondary sources (blogs, forums, third-party tool sites) or not found at all → mark UNVERIFIED; filling gaps from training memory is forbidden (especially for version numbers, API parameters, prices).
 Acceptance criteria: every question has either "answer + source" or "UNVERIFIED + where it was checked."
 Report format: a fact list, ≤ 2 lines + URL per item. Long quotes get saved to [scratch path], report the path back.
 ```

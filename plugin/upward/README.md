@@ -6,9 +6,9 @@ It injects a small always-on core of rules at session start, and defers the deta
 
 ## What it does
 
-- **Commander doesn't descend.** Bulk reading, repo scans, batch edits, and verification runs get delegated to subagents. The main conversation only handles task breakdown, judgment calls, and talking to the user.
-- **Verification isn't self-verification.** Completion claims need execution evidence (build, test, real run, read-back). Verification always goes to a fresh agent, never back to the agent that did the work.
-- **Model escalation ladder.** Haiku fails once → escalate to Sonnet with the error attached. Sonnet fails twice on the same subtask → escalate to Opus with both failure traces. Opus solves the pattern → write it down as explicit steps and hand it back down to Sonnet/Haiku.
+- **One warm context does the work.** The main context executes all implementation itself and runs its own gates as it goes; subagents are read-only — the end-of-run consumer-seat review, read-backs, second opinions, bulk reads, and research digests — and never write project files.
+- **Verification isn't self-verification.** Each item's completion claim stands on the worker's own execution evidence (build, test, real run); the final done-and-good-enough verdict gets exactly one independent pass — a fresh-context consumer-seat review that boots and exercises the artifact, never performed by whoever did the work.
+- **Model escalation ladder for dispatched (read-only) tasks.** Haiku fails once → escalate to Sonnet with the error attached. Sonnet fails twice on the same subtask → escalate to Opus with both failure traces. Opus cracks the pattern → write it down so cheaper checks can reuse it; any edits that follow are applied by the main context.
 - **Roll back before re-approaching.** When a signal says the direction is wrong (whack-a-mole fixes, the same error recurring, scope doubling, fighting the tool), revert to the last known-good commit before stacking another fix on broken state.
 - **Three narrow cases for asking the user.** Irreversible and not explicitly requested; two defensible options where the right one depends on context only the user has; or the task's premise itself looks wrong.
 
