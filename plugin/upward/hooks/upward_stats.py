@@ -41,12 +41,39 @@ def read_hook_input():
 
 
 def find_recent_transcript(cwd):
-    slug = re.sub(r"[^A-Za-z0-9]", "-", cwd)
-    project_dir = os.path.join(os.path.expanduser("~"), ".claude", "projects", slug)
-    candidates = glob.glob(os.path.join(project_dir, "*.jsonl"))
-    if not candidates:
-        return None
-    return max(candidates, key=os.path.getmtime)
+    # Walk up from cwd: the session may have started in an ancestor of the
+    # current shell directory, and its transcripts live under that ancestor's
+    # project slug. The nearest ancestor with any transcript wins.
+    d = os.path.abspath(cwd)
+    while True:
+        slug = re.sub(r"[^A-Za-z0-9]", "-", d)
+        project_dir = os.path.join(os.path.expanduser("~"), ".claude", "projects", slug)
+        candidates = glob.glob(os.path.join(project_dir, "*.jsonl"))
+        if candidates:
+            return max(candidates, key=os.path.getmtime)
+        parent = os.path.dirname(d)
+        if parent == d:
+            return None
+        d = parent
+
+
+def resolve_anchor(cwd, transcript_path):
+    """A session's stats belong to the directory the session started in, not
+    to wherever the shell has wandered by the time this hook fires — a
+    mid-session `cd` into a subdirectory must not scatter a fresh .upward/
+    there. The transcript's parent directory name is the slug of the starting
+    directory, so the anchor is the nearest ancestor of cwd (cwd included)
+    whose slug matches it; if none matches (the shell left the project tree
+    entirely), fall back to cwd unchanged."""
+    project_slug = os.path.basename(os.path.dirname(transcript_path))
+    d = os.path.abspath(cwd)
+    while True:
+        if re.sub(r"[^A-Za-z0-9]", "-", d) == project_slug:
+            return d
+        parent = os.path.dirname(d)
+        if parent == d:
+            return cwd
+        d = parent
 
 
 def upward_dir(cwd):
@@ -557,6 +584,15 @@ def main():
     hook_input = read_hook_input()
     cwd = hook_input.get("cwd") or os.getcwd()
 
+    transcript_path = hook_input.get("transcript_path")
+    if not transcript_path or not os.path.isfile(transcript_path):
+        transcript_path = find_recent_transcript(cwd)
+    if not transcript_path or not os.path.isfile(transcript_path):
+        return
+    # Anchor every .upward/ path to the session's starting directory, not to
+    # wherever the shell currently sits.
+    cwd = resolve_anchor(cwd, transcript_path)
+
     migrate_root_files(cwd)
     state = load_state(cwd)
     if not state or not state.get("enabled"):
@@ -567,12 +603,6 @@ def main():
     except Exception:
         return
     lock = acquire_lock(cwd)  # held (referenced) until main() returns
-
-    transcript_path = hook_input.get("transcript_path")
-    if not transcript_path or not os.path.isfile(transcript_path):
-        transcript_path = find_recent_transcript(cwd)
-    if not transcript_path or not os.path.isfile(transcript_path):
-        return
 
     cache, reset = load_cache(cwd, transcript_path, level)
     parse_transcript_incremental(transcript_path, cache)
