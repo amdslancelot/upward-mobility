@@ -1,14 +1,28 @@
 #!/usr/bin/env python3
-# upward-stats — Stop hook. Runs after every turn; no-op unless
-# .upward/stats-state.json (under the project root) has {"enabled": true}.
+# upward-stats — Stop and SubagentStop hook. Runs after every turn (and after
+# every finished subagent); no-op unless .upward/stats-state.json (under the
+# project root) has {"enabled": true}.
 # When enabled, resumes parsing the session transcript from where it left off
 # (byte offset cached in .upward/stats-cache.json) and appends only the rows
 # for newly-completed tasks to .upward/UPWARD-STATS.md — it never rereads the
 # whole transcript or rewrites the whole file. Everything lives in the .upward/
-# dot-directory so repo scans and glob patterns skip it by default. Subagent rows are held back until
-# their jsonl file's size is unchanged across two consecutive Stop events
-# (i.e. the subagent has finished writing); this avoids emitting a row for a
-# still-running background agent and then never being able to fix the count.
+# dot-directory so repo scans and glob patterns skip it by default. A subagent
+# row is emitted as soon as the agent is provably finished: either its Agent
+# tool_result has appeared in the main transcript (the definitive signal for
+# FOREGROUND dispatches, whose result is written only once the agent is done —
+# background launches get an immediate acknowledgment instead, so they are
+# never tracked this way), or its jsonl file's size is unchanged across two
+# consecutive hook events. The wait-for-stability
+# fallback avoids emitting a row for a still-running agent and then never
+# being able to fix the count; the tool_result signal exists because waiting
+# for two sightings loses the LAST dispatch of a run — its file takes a
+# trailing flush after its SubagentStop, the final Stop sees the size change,
+# and no further event ever comes.
+# SubagentStop events exist so headless one-turn sessions, which fire Stop
+# exactly once, still get enough events for both paths. On SubagentStop the main-task rows are
+# NOT flushed: the main turn is still in flight at that moment, and a task row
+# is emitted only once per prompt, so flushing early would freeze a partial
+# count that no later event could correct.
 # Never raises past main() — a stats bug must not break the user's session.
 import glob
 import json
@@ -27,12 +41,39 @@ def read_hook_input():
 
 
 def find_recent_transcript(cwd):
-    slug = re.sub(r"[^A-Za-z0-9]", "-", cwd)
-    project_dir = os.path.join(os.path.expanduser("~"), ".claude", "projects", slug)
-    candidates = glob.glob(os.path.join(project_dir, "*.jsonl"))
-    if not candidates:
-        return None
-    return max(candidates, key=os.path.getmtime)
+    # Walk up from cwd: the session may have started in an ancestor of the
+    # current shell directory, and its transcripts live under that ancestor's
+    # project slug. The nearest ancestor with any transcript wins.
+    d = os.path.abspath(cwd)
+    while True:
+        slug = re.sub(r"[^A-Za-z0-9]", "-", d)
+        project_dir = os.path.join(os.path.expanduser("~"), ".claude", "projects", slug)
+        candidates = glob.glob(os.path.join(project_dir, "*.jsonl"))
+        if candidates:
+            return max(candidates, key=os.path.getmtime)
+        parent = os.path.dirname(d)
+        if parent == d:
+            return None
+        d = parent
+
+
+def resolve_anchor(cwd, transcript_path):
+    """A session's stats belong to the directory the session started in, not
+    to wherever the shell has wandered by the time this hook fires — a
+    mid-session `cd` into a subdirectory must not scatter a fresh .upward/
+    there. The transcript's parent directory name is the slug of the starting
+    directory, so the anchor is the nearest ancestor of cwd (cwd included)
+    whose slug matches it; if none matches (the shell left the project tree
+    entirely), fall back to cwd unchanged."""
+    project_slug = os.path.basename(os.path.dirname(transcript_path))
+    d = os.path.abspath(cwd)
+    while True:
+        if re.sub(r"[^A-Za-z0-9]", "-", d) == project_slug:
+            return d
+        parent = os.path.dirname(d)
+        if parent == d:
+            return cwd
+        d = parent
 
 
 def upward_dir(cwd):
@@ -92,6 +133,7 @@ def empty_cache(transcript_path, level):
         "seen_msg_ids": [],
         "emitted_pids": [],
         "subagents": {},
+        "agent_results": {},
     }
 
 
@@ -110,9 +152,15 @@ def load_cache(cwd, transcript_path, level):
 
 
 def save_cache(cwd, cache):
+    # Temp-file + rename so a concurrent reader can never see a half-written
+    # cache (a torn read parses as invalid, forces reset=True, and the
+    # same-session reset branch would delete UPWARD-STATS.md mid-session).
+    path = cache_path(cwd)
+    tmp = path + ".tmp"
     try:
-        with open(cache_path(cwd), "w") as f:
+        with open(tmp, "w") as f:
             json.dump(cache, f)
+        os.replace(tmp, path)
     except Exception:
         pass
 
@@ -173,6 +221,68 @@ def update_desc(call, content):
             call["_desc_prio"] = prio
 
 
+def collect_agent_ids(content, agent_results):
+    """Record every foreground Agent/Task tool_use id from an assistant
+    message. The dict maps tool_use_id -> whether its tool_result has been
+    seen in the main transcript yet; a True value is process_subagents'
+    definitive signal that the corresponding subagent has finished.
+    Background dispatches are deliberately NOT tracked: their tool_result is
+    an immediate launch acknowledgment, not a completion signal, so they must
+    stay on the size-stability path."""
+    if not isinstance(content, list):
+        return
+    for block in content:
+        if (isinstance(block, dict) and block.get("type") == "tool_use"
+                and block.get("name") in ("Agent", "Task")
+                and not (block.get("input") or {}).get("run_in_background")):
+            agent_results.setdefault(block.get("id"), False)
+
+
+def mark_agent_results(content, agent_results):
+    """Flip a tracked Agent tool_use id to True when its tool_result arrives
+    (tool results come back inside 'user' transcript lines)."""
+    if not isinstance(content, list):
+        return
+    for block in content:
+        if isinstance(block, dict) and block.get("type") == "tool_result":
+            tid = block.get("tool_use_id")
+            if tid in agent_results:
+                agent_results[tid] = True
+
+
+def collect_skills(content, into):
+    """Append the name of every Skill tool_use block in `content` to `into`.
+    Tracked separately from the per-call description because several tool_use
+    blocks can share one API call, and the description keeps only the first —
+    a Skill load batched with another tool call would otherwise go unrecorded."""
+    if not isinstance(content, list):
+        return
+    for block in content:
+        if isinstance(block, dict) and block.get("type") == "tool_use" and block.get("name") == "Skill":
+            name = (block.get("input") or {}).get("skill")
+            if name:
+                into.append(str(name))
+
+
+def skill_injected_estimate(name):
+    """Approximate token cost of a skill's SKILL.md landing in context, for
+    skills that ship with this plugin (resolved relative to this hook file).
+    Returns a short label fragment; the ~len/4 heuristic is an estimate and is
+    marked as such. Unknown skills return 'size unknown'."""
+    here = os.path.dirname(os.path.abspath(__file__))
+    if name == "core.md":
+        path = os.path.join(here, "..", "core.md")
+    else:
+        short = name.split(":")[-1]
+        path = os.path.join(here, "..", "skills", short, "SKILL.md")
+    try:
+        with open(path) as f:
+            n = len(f.read()) // 4
+        return f"~{n:,} tok injected"
+    except Exception:
+        return "size unknown"
+
+
 def parse_transcript_incremental(path, cache):
     """Resume parsing the main transcript from cache["offset"], merging newly
     seen lines into cache["tasks"]/["order"] in place. Each 'assistant' JSONL
@@ -182,14 +292,27 @@ def parse_transcript_incremental(path, cache):
     tasks = cache["tasks"]
     order = cache["order"]
     current_pid = cache["current_pid"]
+    agent_results = cache.setdefault("agent_results", {})
     try:
-        fh = open(path)
+        fh = open(path, "rb")
     except Exception:
         return
     with fh:
+        # Binary mode with an explicit readline loop: a SubagentStop event can
+        # fire while the main turn is still appending to this file, so the
+        # last line may be a torn partial write. Only newline-terminated lines
+        # are consumed; an unterminated tail is left for the next event to
+        # re-read whole — advancing the offset past a fragment would silently
+        # lose the rest of that record (or a promptId) forever.
         fh.seek(cache["offset"])
-        for line in fh:
-            line = line.strip()
+        while True:
+            raw = fh.readline()
+            if not raw:
+                break
+            if not raw.endswith(b"\n"):
+                fh.seek(-len(raw), os.SEEK_CUR)
+                break
+            line = raw.decode("utf-8", "replace").strip()
             if not line:
                 continue
             try:
@@ -200,10 +323,13 @@ def parse_transcript_incremental(path, cache):
                 continue
             t = d.get("type")
             if t == "user":
+                content = d.get("message", {}).get("content")
+                # Scan for Agent tool_results before the promptId gate below —
+                # tool-result user lines don't reliably carry a promptId.
+                mark_agent_results(content, agent_results)
                 pid = d.get("promptId")
                 if not pid:
                     continue
-                content = d.get("message", {}).get("content")
                 label = None
                 if isinstance(content, str):
                     cmd_m = re.search(r"<command-name>([^<]*)</command-name>", content)
@@ -222,11 +348,15 @@ def parse_transcript_incremental(path, cache):
                     tasks[pid]["label"] = label
                 current_pid = pid
             elif t == "assistant":
+                msg = d.get("message", {})
+                # Track Agent ids regardless of prompt attribution — the
+                # finished-signal bookkeeping must not depend on current_pid.
+                collect_agent_ids(msg.get("content"), agent_results)
                 if current_pid is None:
                     continue
-                msg = d.get("message", {})
                 msg_id = msg.get("id")
                 calls = tasks[current_pid]["calls"]
+                collect_skills(msg.get("content"), tasks[current_pid].setdefault("skills", []))
                 if msg_id and msg_id in seen_msg_ids:
                     if calls:
                         update_desc(calls[-1], msg.get("content"))
@@ -252,7 +382,8 @@ def collect_new_main_tasks(cache):
         if not task or not task["calls"]:
             continue
         new_tasks.append({"label": task["label"] or "(tool continuation)",
-                           "calls": task["calls"], "ts": task["ts"]})
+                           "calls": task["calls"], "ts": task["ts"],
+                           "skills": task.get("skills", [])})
         cache["emitted_pids"].append(pid)
     return new_tasks
 
@@ -296,16 +427,21 @@ def aggregate_all_calls(path):
 
 
 def process_subagents(session_dir, cache):
-    """A subagent's row is only emitted once its jsonl file's size is
-    unchanged from the previous Stop event — proof it's done writing.
-    A background agent that's still growing gets skipped this turn and
-    picked up whole+accurate on a later one, rather than emitted early
-    with a count that can never be corrected."""
+    """A subagent's row is emitted as soon as the agent is provably finished.
+    The definitive signal: its Agent tool_result has appeared in the main
+    transcript (recorded in cache["agent_results"] by the incremental parse) —
+    the harness writes that only after the agent is done, so the row can go
+    out immediately, even on this event's first sighting of the file. Without
+    that signal (background agent still open, or no meta/toolUseId), fall back
+    to waiting until the jsonl file's size is unchanged from the previous hook
+    event — never emit a row for a possibly-still-running agent, because a
+    wrong count can never be corrected."""
     subdir = os.path.join(session_dir, "subagents")
     if not os.path.isdir(subdir):
         return []
     new_tasks = []
     cache_sub = cache["subagents"]
+    agent_results = cache.get("agent_results", {})
     for jsonl_path in sorted(glob.glob(os.path.join(subdir, "*.jsonl"))):
         try:
             size = os.path.getsize(jsonl_path)
@@ -314,25 +450,34 @@ def process_subagents(session_dir, cache):
         entry = cache_sub.get(jsonl_path)
         if entry and entry.get("emitted"):
             continue
-        if entry is None:
-            cache_sub[jsonl_path] = {"size": size, "emitted": False}
-            continue
-        if entry["size"] != size:
-            entry["size"] = size
-            continue
         meta_path = os.path.splitext(jsonl_path)[0] + ".meta.json"
-        desc = agent_type = None
+        desc = agent_type = tool_use_id = None
         try:
             with open(meta_path) as f:
                 meta = json.load(f)
             desc = meta.get("description")
             agent_type = meta.get("agentType")
+            tool_use_id = meta.get("toolUseId")
         except Exception:
             pass
+        finished = bool(tool_use_id) and bool(agent_results.get(tool_use_id))
+        if not finished:
+            if entry is None:
+                cache_sub[jsonl_path] = {"size": size, "emitted": False}
+                continue
+            if entry["size"] != size:
+                entry["size"] = size
+                continue
+        if entry is None:
+            entry = cache_sub[jsonl_path] = {"size": size, "emitted": False}
         calls, ts = aggregate_all_calls(jsonl_path)
-        entry["emitted"] = True
         if not calls:
+            # Nothing parseable yet (e.g. the signal beat the file's first
+            # flush) — leave emitted False so a later event retries.
+            entry["size"] = size
             continue
+        entry["emitted"] = True
+        entry["size"] = size
         label = f"[agent] {desc or agent_type or os.path.basename(jsonl_path)}"
         new_tasks.append({"label": label, "calls": calls, "ts": ts})
     return new_tasks
@@ -378,6 +523,7 @@ def render_rows(tasks, level):
             cells.append(model or "")
         lines.append("| " + " | ".join(esc(c) for c in cells) + " |")
 
+    zero = {"calls": 0, "output": 0, "cache_write": 0, "cache_read": 0, "fresh_input": 0}
     for task in tasks:
         total = summarize(task["calls"])
         row(task["label"], "-", total, models_label(task["calls"]) if level == "call" else None)
@@ -385,6 +531,13 @@ def render_rows(tasks, level):
             for i, c in enumerate(task["calls"], 1):
                 subtask = c.get("desc") or f"call {i}"
                 row(task["label"], f"{i}. {subtask}", summarize([c]), c["model"])
+        # One informational row per Skill load, at both levels. Token columns
+        # stay zero on purpose: the injected content is already inside the
+        # following call's cache write, so putting an amount here would double
+        # count — the size estimate travels in the label instead.
+        for name in task.get("skills", []):
+            row(task["label"], f"[skill] {name} ({skill_injected_estimate(name)})",
+                zero, "-" if level == "call" else None)
     return lines
 
 
@@ -411,9 +564,34 @@ def append_rows(path, rows):
         f.write("\n".join(rows) + "\n")
 
 
+def acquire_lock(cwd):
+    """Exclusive advisory lock for the whole run of main(). Stop events never
+    overlap, but two SubagentStop events can fire near-simultaneously when
+    agents finish together — unserialized, both could read the parse cache
+    before either saves it and emit the same [agent] row twice. Returns the
+    open lock file handle (held until process exit) or None where flock isn't
+    available (Windows); the single-writer assumption then holds as before."""
+    try:
+        import fcntl
+        fh = open(os.path.join(upward_dir(cwd), ".lock"), "w")
+        fcntl.flock(fh, fcntl.LOCK_EX)
+        return fh
+    except Exception:
+        return None
+
+
 def main():
     hook_input = read_hook_input()
     cwd = hook_input.get("cwd") or os.getcwd()
+
+    transcript_path = hook_input.get("transcript_path")
+    if not transcript_path or not os.path.isfile(transcript_path):
+        transcript_path = find_recent_transcript(cwd)
+    if not transcript_path or not os.path.isfile(transcript_path):
+        return
+    # Anchor every .upward/ path to the session's starting directory, not to
+    # wherever the shell currently sits.
+    cwd = resolve_anchor(cwd, transcript_path)
 
     migrate_root_files(cwd)
     state = load_state(cwd)
@@ -424,33 +602,50 @@ def main():
         os.makedirs(upward_dir(cwd), exist_ok=True)
     except Exception:
         return
-
-    transcript_path = hook_input.get("transcript_path")
-    if not transcript_path or not os.path.isfile(transcript_path):
-        transcript_path = find_recent_transcript(cwd)
-    if not transcript_path or not os.path.isfile(transcript_path):
-        return
+    lock = acquire_lock(cwd)  # held (referenced) until main() returns
 
     cache, reset = load_cache(cwd, transcript_path, level)
     parse_transcript_incremental(transcript_path, cache)
 
-    new_tasks = collect_new_main_tasks(cache)
+    # On SubagentStop the main turn is still running: parse (cheap, keeps the
+    # offset current) but only flush main-task rows on Stop — a task row is
+    # emitted once per prompt, so an early flush would freeze a partial count.
+    on_subagent_stop = hook_input.get("hook_event_name") == "SubagentStop"
+    new_tasks = [] if on_subagent_stop else collect_new_main_tasks(cache)
     session_dir = os.path.splitext(transcript_path)[0]
     new_tasks += process_subagents(session_dir, cache)
     new_tasks.sort(key=lambda task: task.get("ts") or "")
 
     out_path = stats_path(cwd)
+    session_id = os.path.basename(session_dir)
     if reset and os.path.exists(out_path):
+        # Starting over. If the existing file belongs to a DIFFERENT session,
+        # it is someone else's data (e.g. this session's shell wandered into a
+        # directory holding a finished benchmark run's stats) — archive it
+        # aside instead of destroying it. Only a same-session reset (the user
+        # flipped /upward-stats level) discards the file.
         try:
-            os.remove(out_path)
+            with open(out_path) as f:
+                head = f.read(2000)
+            m = re.search(r"Session: `([^`]+)`", head)
+            old_session = m.group(1) if m else None
+            if old_session and old_session != session_id:
+                os.replace(out_path, os.path.join(
+                    upward_dir(cwd), f"UPWARD-STATS-{old_session[:8]}.md"))
+            else:
+                os.remove(out_path)
         except Exception:
             pass
 
     if new_tasks:
-        session_id = os.path.basename(session_dir)
         rows = render_rows(new_tasks, level)
         if not os.path.exists(out_path):
-            write_new_file(out_path, session_id, level, rows)
+            # First write of a session also records the always-on injection:
+            # core.md enters context at every SessionStart, before any task.
+            zero = ["0"] * 5 + (["-"] if level == "call" else [])
+            core_row = ("| (session start) | [skill] core.md "
+                        f"({skill_injected_estimate('core.md')}) | " + " | ".join(zero) + " |")
+            write_new_file(out_path, session_id, level, [core_row] + rows)
         else:
             append_rows(out_path, rows)
 

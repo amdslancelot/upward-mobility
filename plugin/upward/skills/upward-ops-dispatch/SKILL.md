@@ -17,7 +17,7 @@ description: Delegation rules and prompt templates for the two dispatchable task
 
 The main context does the work; subagents read, run, and report — they never modify project files. Implementation, refactors, and fixes stay in the main context, serially, where the whole contract lives in one head. This line is structural rather than a judgment call because every judgment-shaped exception measured so far was taken and cost more than it saved: per-item builder dispatch paid more in cold-starts (each subagent re-reads the plan, the contract, the tree from zero) than the redundancy it removed, and a "genuinely parallel workstreams" exception got a three-layer build split across three builders that drifted at their shared contract seams — the run's fatal defects sat exactly at the boundaries between them — while costing the most tokens of any run measured. Only two things are worth dispatching:
 
-1. **Fresh-context checks** — the end-of-run consumer-seat review, a read-back, a second opinion. Independence is the product, and it cannot be produced inside the context that did the work. These agents may execute the artifact and its gates (booting it, dry-running a deploy, feeding it real input is their whole job); what they never do is edit it.
+1. **Fresh-context checks** — the end-of-run consumer-seat review, a read-back, a second opinion. Independence is the product, and it cannot be produced inside the context that did the work. The end-of-run review is static by default (it reads and attacks); these agents execute the artifact and its gates — booting it, dry-running a deploy, feeding it real input — only when the user asked for execution-backed depth; what they never do at any depth is edit it.
 2. **Bulk read-and-report** — long log trawls, wide repo scans, ingesting material that would flood the main context; the subagent reads a lot and reports back a little.
 
 Everything else stays in the main thread. Dispatch in the foreground: every background dispatch wakes the main thread again with a paid notification round, and those wake-ups alone have been measured at a quarter of a run's raw token bill.
@@ -66,7 +66,7 @@ The principle itself is one of this plugin's two always-on reflexes (see `core.m
 | Over-engineering | Abstractions/dependencies that shouldn't exist | general-purpose agent with that focus explicitly stated in the prompt |
 | Document consistency | Cross-file contradictions, placeholders, broken cross-references, ambiguous sentences a weaker model would misread | general-purpose agent + template #3 below |
 | Mechanical read-back | Does the file exist? Is the content complete? Are sentences unbroken? | general-purpose agent, Haiku is enough |
-| Reality check (consumer-seat smoke) | Does the artifact work when used the way its real consumer uses it — boot it, deploy it, feed it a real input, run any repeatable path twice | general-purpose agent that actually runs the artifact; a real run is required, "it builds" doesn't qualify — but it does not re-run install/build/test gates the worker already logged with execution evidence |
+| Reality check (consumer-seat smoke) | Does the artifact work when used the way its real consumer uses it — static by default: full source read plus an adversarial what-breaks-in-real-use sweep, the verdict saying so; at user-requested execution-backed depth: boot it, deploy it, feed it a real input, run any repeatable path twice ("it builds" doesn't qualify as a run) | general-purpose agent; at no depth does it re-run install/build/test gates the worker already logged with execution evidence |
 
 The rubric in one line: **use a diff tool to review a diff, use general-purpose with custom-defined checks to review content.** A specialized tool's field of view is hardcoded — any risk outside that view, it stays silent on. Silence isn't the same as "no problem."
 
@@ -149,6 +149,7 @@ Report format: a fact list, ≤ 2 lines + URL per item. Long quotes get saved to
 ```
 Background: [what this diff/file is for]. Original request, verbatim: [paste the user's original request — the acceptance criteria below were authored inside this run and may themselves be wrong; checking them against the request and against reality is part of your job].
 Task: review [diff scope / file list], looking only for [correctness bugs | ambiguous phrasing a weak model would misread | rules that contradict each other | over-engineering | what breaks in real use that the criteria don't cover] (pick one focus, review one kind per pass).
+Depth: [static (default — read and attack, no build/boot/run, verdict says static) | execution-backed, only when the user asked for it — boot and exercise per the reality-check row above]
 Acceptance criteria: one line per finding: location + problem + suggested fix + severity. Do not write up the parts that have no problems (no praise).
 Report format: a findings list sorted by severity; 0 findings → explicitly state "checked X/Y/Z aspects, nothing found." Do not modify any files — you report; whether to fix is the commander's call.
 Special focus: [risk points specific to this task]
