@@ -11,6 +11,12 @@
       "description": "Always-on operating discipline (commander-doesn't-descend, verify-not-self-verify, model escalation ladder, rollback-before-reapproach) plus on-demand ops skills for weak-model sessions.",
       "source": "./upward",
       "category": "productivity"
+    },
+    {
+      "name": "upward-stats",
+      "description": "Per-prompt/per-call token usage tracking: a Stop/SubagentStop hook logs a usage table to .upward/UPWARD-STATS.md, toggled with /upward-stats. Standalone — pairs with upward but needs it not.",
+      "source": "./upward-stats",
+      "category": "productivity"
     }
   ]
 }

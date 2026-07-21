@@ -265,22 +265,32 @@ def collect_skills(content, into):
 
 
 def skill_injected_estimate(name):
-    """Approximate token cost of a skill's SKILL.md landing in context, for
-    skills that ship with this plugin (resolved relative to this hook file).
+    """Approximate token cost of a skill's SKILL.md landing in context.
     Returns a short label fragment; the ~len/4 heuristic is an estimate and is
-    marked as such. Unknown skills return 'size unknown'."""
+    marked as such. Files are searched across a few candidate plugin roots: this
+    stats plugin ships only the upward-stats skill, while core.md and the
+    upward-ops-* skills live in the sibling `upward` plugin (present only when
+    that plugin is co-installed). Anything not found returns 'size unknown'."""
     here = os.path.dirname(os.path.abspath(__file__))
-    if name == "core.md":
-        path = os.path.join(here, "..", "core.md")
-    else:
-        short = name.split(":")[-1]
-        path = os.path.join(here, "..", "skills", short, "SKILL.md")
-    try:
-        with open(path) as f:
-            n = len(f.read()) // 4
-        return f"~{n:,} tok injected"
-    except Exception:
-        return "size unknown"
+    # Candidate plugin roots, most specific first: this plugin, then a sibling
+    # `upward` plugin checked out alongside it in the marketplace layout.
+    roots = [
+        os.path.join(here, ".."),
+        os.path.join(here, "..", "..", "upward"),
+    ]
+    for root in roots:
+        if name == "core.md":
+            path = os.path.join(root, "core.md")
+        else:
+            short = name.split(":")[-1]
+            path = os.path.join(root, "skills", short, "SKILL.md")
+        try:
+            with open(path) as f:
+                n = len(f.read()) // 4
+            return f"~{n:,} tok injected"
+        except Exception:
+            continue
+    return "size unknown"
 
 
 def parse_transcript_incremental(path, cache):
@@ -641,11 +651,17 @@ def main():
         rows = render_rows(new_tasks, level)
         if not os.path.exists(out_path):
             # First write of a session also records the always-on injection:
-            # core.md enters context at every SessionStart, before any task.
-            zero = ["0"] * 5 + (["-"] if level == "call" else [])
-            core_row = ("| (session start) | [skill] core.md "
-                        f"({skill_injected_estimate('core.md')}) | " + " | ".join(zero) + " |")
-            write_new_file(out_path, session_id, level, [core_row] + rows)
+            # when the sibling `upward` plugin is installed, its core.md enters
+            # context at every SessionStart, before any task. If core.md can't
+            # be found (upward not co-installed), skip the row — there is no
+            # such injection to account for.
+            core_est = skill_injected_estimate("core.md")
+            prefix = []
+            if core_est != "size unknown":
+                zero = ["0"] * 5 + (["-"] if level == "call" else [])
+                prefix = ["| (session start) | [skill] core.md "
+                          f"({core_est}) | " + " | ".join(zero) + " |"]
+            write_new_file(out_path, session_id, level, prefix + rows)
         else:
             append_rows(out_path, rows)
 

@@ -1,0 +1,8 @@
+{
+  "name": "upward-stats",
+  "version": "0.1.0",
+  "description": "Per-prompt/per-call token usage tracking for Claude Code sessions. A Stop/SubagentStop hook parses the session transcript and appends a usage table to .upward/UPWARD-STATS.md; the /upward-stats skill toggles it on/off and switches between task- and call-level detail. Standalone — works with or without the upward operating-discipline plugin.",
+  "author": {
+    "name": "Lans Hung"
+  }
+}

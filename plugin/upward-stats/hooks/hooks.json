@@ -1,0 +1,30 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/upward_stats.py\"; exit 0",
+            "commandWindows": "python \"%CLAUDE_PLUGIN_ROOT%\\hooks\\upward_stats.py\"",
+            "timeout": 10,
+            "statusMessage": "Recording upward-stats..."
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/upward_stats.py\"; exit 0",
+            "commandWindows": "python \"%CLAUDE_PLUGIN_ROOT%\\hooks\\upward_stats.py\"",
+            "timeout": 10,
+            "statusMessage": "Recording upward-stats..."
+          }
+        ]
+      }
+    ]
+  }
+}
