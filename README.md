@@ -100,14 +100,26 @@ Once installed, the core rules load automatically at the start of every session 
 
 To turn on token-usage logging, install `upward-stats` and run `/upward-stats on` (and `/upward-stats off` to stop). See `plugin/upward-stats/README.md` for the full command set.
 
-## What the measurements support
+## Does it work?
 
-The rules in this repo were not designed in the abstract — most of them exist because a measured run paid for their absence, and the ones that stopped earning their place were removed. Two honest conclusions from that series:
+The rules here were not designed in the abstract. One fixed build task was run many times, each round on a different plugin version, and each round measured on real dollars and on the quality of what shipped. Most rules exist because a run paid for their absence; the ones that stopped earning their place were removed. Two things have to be said about that series before any number from it means anything.
 
-- **The cost mechanics are settled.** The current chassis runs at a predictable per-call rate with no cache-miss lottery, and the always-on text itself costs roughly a cent over a long run. The rules that cut re-reads more than pay for the ones that don't.
-- **Quality is not.** No generic-discipline variant reliably produced a *delivering* build on its own. The runs that did deliver had domain-specific defect memory available to them — which is exactly what a general-purpose plugin must not ship, since it would make the plugin useless for building anything else. Project-side defect memory that the plugin reads when present is the open design question.
+**The checklist-era versions (0.3.6 through 0.5.0) don't count — they were cheating.** Those versions carried a "known killers" checklist distilled from defects that had shipped in *earlier rounds of the same fixed task*: the scaffold memorising its own benchmark. It raised the scores, and it narrowed the plugin to one app shape, which is what makes those versions unusable as a general-purpose plugin. 0.5.0 removed the checklist; the current 0.6.0 chassis was forked from 0.3.2, which predates it. Any comparison that includes a checklist-era round is measuring the cheat, not the discipline.
 
-Adopt this for the cost structure and the long-run discipline. Don't adopt it expecting it to substitute for knowing your own domain's failure modes.
+**Review depth turned out not to be unifiable.** The original goal was to reproduce round 5's numbers. That target dissolved once it became clear that how hard the reviewer looked moved the score more than the plugin version did — re-grading a single unchanged artifact against a stricter standard moved it by more than three points. What survives is one board on which all 19 runs were graded to a single standard.
+
+On that board, comparing only checklist-free plugin runs against runs with no plugin:
+
+| Run | Condition | Delivery tier | Headline |
+|---|---|---|---|
+| round 1 | plugin 0.1.x | **T1 — delivers** | 9.6 |
+| round 15 | plugin 0.6.0-light | **T1 — delivers** | 9.5 |
+| round 13 | no plugin, verified zero injection | T2 — delivers with faults | 6.8 |
+| "bare" Opus / Fable / Sonnet | no plugin, but an old core.md was injected | T3 — does not deliver | 4.4 / 4.3 / 4.2 |
+
+Both checklist-free plugin rounds land a full delivery tier above the cleanest no-plugin control, on the same task and the same grading standard, and two tiers above the older bare runs. That is what this repo claims: the discipline itself — not a memorised defect list — moves what a model actually ships.
+
+Cost behaves independently and is measured separately: zero cache misses across 338 small-write calls, per-call deliberation back at its floor, and the always-on text itself costing about a cent over a long run. Total spend is a different question and is not settled — the remaining gap to the cheapest measured run is build footprint (calls × context), which no rule currently governs.
 
 ## Full documentation
 

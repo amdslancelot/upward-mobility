@@ -1,6 +1,6 @@
 # Ops Template Pack — an agent operating discipline weak models can actually follow
 
-This is a reusable, cross-project operating-discipline template for Claude Code (or any similar agent harness). The original was built in a single top-tier-model (Fable 5) session. The goal: externalize senior-model judgment into rules a cheaper model can keep following for a long session.
+This is a reusable, cross-project operating-discipline template for Claude Code (or any similar agent harness). The goal: externalize senior-model judgment into rules a cheaper model can keep following for a long session.
 
 This directory is also **a live project rooted in itself**:
 - `CLAUDE.md` is this directory's actual index (loaded every session).
