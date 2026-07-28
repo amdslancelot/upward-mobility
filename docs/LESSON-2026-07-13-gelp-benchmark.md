@@ -1,5 +1,37 @@
 # Lesson 2026-07-13: Gelp benchmark — the scaffold Goodharted itself
 
+> **Status (updated 2026-07-27): the scores below are superseded; the mechanism is not.**
+>
+> **Superseded — the numbers.** Every score here was produced on the v1 craft
+> scale at *shallow* review depth (source read, artifact never booted), one run
+> per condition. The same-standard re-grade of 2026-07-19 measured what that
+> costs: on the same artifact, shallow and live-demonstrated scores diverged by
+> up to **5.6 points**, and not uniformly — a shallow board mostly ranks how
+> thoroughly a run polished its *source-visible* defects while leaving runtime
+> ones intact. Treat the 7.0 / 7.7 / 4.5 / 5.8 / 9.0 ordering below as
+> unreliable, including the "bare Fable shipped the only production-viable build"
+> claim.
+>
+> **Stands — the mechanism.** Self-authored acceptance criteria inheriting their
+> author's blind spots was confirmed, then generalised. The Known-killers
+> checklist that later versions leaned on turned out to be distilled from defects
+> that had shipped in *earlier rounds of this same fixed task* — the scaffold
+> memorising its own benchmark, which raised the score while narrowing the plugin
+> to one app shape and inflating its cost. The "Testable prediction" below became
+> a standing protocol rule, and a held-out second task was added as the only
+> check that detects this class of failure.
+>
+> **Provenance.** This experiment was the cross-sectional first cut: one plugin
+> version, five parallel conditions, one day. It later grew into a fifteen-round
+> longitudinal lab in the sibling `token_test3` repo, where the plugin version —
+> not the model — is the variable. The Opus+scaffold session here appears to be
+> that lab's Round 1 (matching USD 5.77 and legacy craft 7.0).
+>
+> **Read next:** `token_test3/docs/benchmark-validity.md` — the five ways this
+> style of benchmark invalidates itself and which of them can be repaired after
+> the fact; `token_test3/docs/UPWARD-ROUNDS-STORY.md` — the fifteen-round
+> narrative and the re-grade table.
+
 ## Verdict
 
 Five fresh headless sessions built the same deploy-ready three-layer app (Next.js + k8s + Terraform). Dollar cost was flat across every condition ($5.77–$6.89), but shipped quality was not: **both ops-plan-scaffolded runs ranked below their bare counterparts** in a side-by-side code review (Opus 7.0 scaffolded vs 7.7 bare; Sonnet 4.5 scaffolded vs 5.8 bare). Bare Fable shipped the only production-viable build (9.0/10). The scaffold's extra raw tokens (3–4x) were almost entirely cheap cache reads, so cost is no longer the concern — correctness is.
