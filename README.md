@@ -99,20 +99,20 @@ To turn on token-usage logging, install `upward-stats` and run `/upward-stats on
 
 ## Does it work?
 
-The rules here were not designed in the abstract. One fixed build task was run many times, each round on a different plugin version, and each round measured on real dollars and on the quality of what shipped. Most rules exist because a run paid for their absence; the ones that stopped earning their place were removed. One thing has to be said about that series before any number from it means anything.
+The rules here were not designed in the abstract. One fixed build task was run many times, each run on a different plugin version, and each measured on real dollars and on the quality of what shipped. Most rules exist because a run paid for their absence; the ones that stopped earning their place were removed. One thing has to be said about that series before any number from it means anything.
 
 **Review depth turned out not to be unifiable.** How hard the reviewer looked moved the score more than the plugin version did — re-grading a single unchanged artifact against a stricter standard moved it by more than three points. So the only comparison worth reading is the one board on which all 19 runs were graded to a single standard.
 
-On that board, the earliest plugin round and the current one against the runs with no plugin:
+On that board, the first plugin version and the current one against the runs with no plugin:
 
-| Run | Condition | Delivery tier | Headline |
-|---|---|---|---|
-| round 1 | plugin 0.1.x | **T1 — delivers** | 9.6 |
-| round 15 | plugin 0.6.0-light | **T1 — delivers** | 9.5 |
-| round 13 | no plugin, verified zero injection | T2 — delivers with faults | 6.8 |
-| "bare" Opus / Fable / Sonnet | no plugin, but an old core.md was injected | T3 — does not deliver | 4.4 / 4.3 / 4.2 |
+| Condition | Delivery tier | Headline |
+|---|---|---|
+| plugin 0.1.x | **T1 — delivers** | 9.6 |
+| plugin 0.6.0 | **T1 — delivers** | 9.5 |
+| no plugin, verified zero injection | T2 — delivers with faults | 6.8 |
+| no plugin, but an old core.md was injected — "bare" Opus / Fable / Sonnet | T3 — does not deliver | 4.4 / 4.3 / 4.2 |
 
-Both plugin rounds land a full delivery tier above the cleanest no-plugin control, on the same task and the same grading standard, and two tiers above the older bare runs. That is what this repo claims: the discipline itself moves what a model actually ships.
+Both plugin versions land a full delivery tier above the cleanest no-plugin control, on the same task and the same grading standard, and two tiers above the older bare runs. That is what this repo claims: the discipline itself moves what a model actually ships.
 
 Cost behaves independently and is measured separately: zero cache misses across 338 small-write calls, per-call deliberation back at its floor, and the always-on text itself costing about a cent over a long run. Total spend is a different question and is not settled — the remaining gap to the cheapest measured run is build footprint (calls × context), which no rule currently governs.
 
