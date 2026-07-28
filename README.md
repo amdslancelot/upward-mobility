@@ -4,8 +4,6 @@
 
 The goal is not parity with any particular top-tier model. It's to raise the floor: a capable model already carries the reflexes that make a long session go well — it verifies before claiming done, it doesn't re-read what it already knows, it notices when the direction is wrong and backs out instead of stacking another fix. A cheaper model has the raw ability to do all of that. What it lacks is the habit of doing it unprompted, and the habit is the first thing to decay over a long run. These rules are that habit, written down.
 
-> Some older documents under `docs/` and `project/` still carry the original framing — "if the top-tier model isn't available or affordable, can a cheaper one reach parity on its own?" That framing is retired; read them for their measurements, not their premise.
-
 ## The core idea
 
 Long agentic coding sessions tend to drift: a weaker model forgets to verify its own work, dispatches tasks it should do itself, or keeps stacking fixes on a broken approach instead of rolling back. `upward` addresses this by splitting operating discipline into two layers:
@@ -68,7 +66,6 @@ plugin/
     │   └── upward_stats.py           # writes .upward/UPWARD-STATS.md
     └── skills/upward-stats/          # the /upward-stats toggle
 
-docs/    # design notes and benchmark write-ups behind the plugin's rules
 project/ # a related, markdown-only "ops template pack" precursor — a portable,
          # project-agnostic version of the same operating discipline, meant to be
          # copied into other repos rather than installed as a Claude Code plugin
