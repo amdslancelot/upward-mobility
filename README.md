@@ -73,29 +73,41 @@ project/ # a related, markdown-only "ops template pack" precursor — a portable
 
 ## Install
 
-### From this repo (local marketplace)
+This repo is a single marketplace, `upward-mobility`, holding two plugins that install and run independently:
 
-```
-/plugin marketplace add /path/to/upward-mobility/plugin
-/plugin install upward@upward-mobility
-```
+| Plugin | What it gives you |
+|---|---|
+| `upward` | The operating discipline — the always-on core plus the six on-demand skills. |
+| `upward-stats` | Token-usage logging to `.upward/UPWARD-STATS.md`, toggled with `/upward-stats`. |
 
-### From GitHub
+Neither requires the other. Installing both is the usual case: `upward` supplies the rules, `upward-stats` shows what they cost.
+
+**Step 1 — add the marketplace once.** From GitHub:
 
 ```
 /plugin marketplace add amdslancelot/upward-mobility --path plugin
-/plugin install upward@upward-mobility
 ```
 
-After installing, run `/reload-plugins` (or restart Claude Code) to pick it up, then verify with `/plugin` — `upward` should show as installed and enabled.
+Or from a local clone:
 
-For token-usage tracking, install the second plugin the same way: `/plugin install upward-stats@upward-mobility`. It works with or without `upward`.
+```
+/plugin marketplace add /path/to/upward-mobility/plugin
+```
+
+**Step 2 — install whichever you want.** Both plugins come from the marketplace added above, so there's nothing further to add:
+
+```
+/plugin install upward@upward-mobility
+/plugin install upward-stats@upward-mobility
+```
+
+**Step 3 — reload.** Run `/reload-plugins` (or restart Claude Code), then check `/plugin`: each plugin you installed should show as installed and enabled. `upward` takes effect on the next session start, since its rules load through the `SessionStart` hook.
 
 ## Usage
 
 Once installed, the core rules load automatically at the start of every session via the `SessionStart` hook — there's nothing to run to turn it on. From there, the model calls the matching skill itself via the Skill tool when a situation calls for it (starting a multi-step task, about to dispatch a subagent, something's broken, unsure if work is really done, feeling stuck). You can also steer it directly in plain language — "make a plan for this first," "dispatch a fresh review before you call this done," "roll back and try a different approach" — and it maps that back to the relevant rule.
 
-To turn on token-usage logging, install `upward-stats` and run `/upward-stats on` (and `/upward-stats off` to stop). See `plugin/upward-stats/README.md` for the full command set.
+With `upward-stats` installed, tracking is on by default; `/upward-stats off` stops it, and `/upward-stats level call` adds a row per API call on top of the per-prompt row.
 
 ## Does it work?
 
@@ -118,4 +130,7 @@ Cost behaves independently and is measured separately: zero cache misses across 
 
 ## Full documentation
 
-See [`plugin/upward/README.md`](plugin/upward/README.md) for the complete plugin documentation, including exactly how the hooks load `core.md` and notes for adapting this plugin to another project or harness.
+Each plugin documents itself:
+
+- [`plugin/upward/README.md`](plugin/upward/README.md) — the complete rule set, exactly how the hook loads `core.md`, and notes for adapting the plugin to another project or harness.
+- [`plugin/upward-stats/README.md`](plugin/upward-stats/README.md) — what the hook records, the columns in `.upward/UPWARD-STATS.md`, and the full `/upward-stats` command set.
