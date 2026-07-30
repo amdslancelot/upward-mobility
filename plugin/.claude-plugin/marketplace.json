@@ -14,7 +14,7 @@
     },
     {
       "name": "upward-stats",
-      "description": "Per-prompt/per-call token usage tracking: a Stop/SubagentStop hook logs a usage table to .upward/UPWARD-STATS.md, toggled with /upward-stats. Standalone — pairs with upward but needs it not.",
+      "description": "Per-call and per-prompt token usage and cost tracking: a Stop/SubagentStop hook logs tokens by type, the model, and an estimated USD cost per row to .upward/UPWARD-STATS.md, toggled with /upward-stats. Standalone — pairs with upward but needs it not.",
       "source": "./upward-stats",
       "category": "productivity"
     }

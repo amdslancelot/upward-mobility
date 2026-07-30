@@ -58,13 +58,14 @@ plugin/
 │       ├── upward-ops-judge/
 │       ├── upward-harness-diagnose/
 │       └── upward-debug/
-└── upward-stats/                     # standalone token-usage tracker
+└── upward-stats/                     # standalone token-usage and cost tracker
     ├── .claude-plugin/plugin.json
     ├── README.md
     ├── hooks/
     │   ├── hooks.json                # registers the Stop and SubagentStop hooks
+    │   ├── pricing.json              # USD/MTok list prices behind the cost column
     │   └── upward_stats.py           # writes .upward/UPWARD-STATS.md
-    └── skills/upward-stats/          # the /upward-stats toggle
+    └── skills/upward-stats/          # /upward-stats — the toggle, plus `clean`
 
 project/ # a related, markdown-only "ops template pack" precursor — a portable,
          # project-agnostic version of the same operating discipline, meant to be
@@ -78,7 +79,7 @@ This repo is a single marketplace, `upward-mobility`, holding two plugins that i
 | Plugin | What it gives you |
 |---|---|
 | `upward` | The operating discipline — the always-on core plus the six on-demand skills. |
-| `upward-stats` | Token-usage logging to `.upward/UPWARD-STATS.md`, toggled with `/upward-stats`. |
+| `upward-stats` | Token-usage and estimated-cost logging to `.upward/UPWARD-STATS.md`, toggled with `/upward-stats`. |
 
 Neither requires the other. Installing both is the usual case: `upward` supplies the rules, `upward-stats` shows what they cost.
 
@@ -107,7 +108,7 @@ Or from a local clone:
 
 Once installed, the core rules load automatically at the start of every session via the `SessionStart` hook — there's nothing to run to turn it on. From there, the model calls the matching skill itself via the Skill tool when a situation calls for it (starting a multi-step task, about to dispatch a subagent, something's broken, unsure if work is really done, feeling stuck). You can also steer it directly in plain language — "make a plan for this first," "dispatch a fresh review before you call this done," "roll back and try a different approach" — and it maps that back to the relevant rule.
 
-With `upward-stats` installed, tracking is on by default; `/upward-stats off` stops it, and `/upward-stats level call` adds a row per API call on top of the per-prompt row.
+With `upward-stats` installed, tracking is on by default, at one row per API call plus a per-prompt total — each row carrying its token counts, the model that ran it, and an estimated USD cost. `/upward-stats off` stops it, `/upward-stats level task` collapses the table back to one row per prompt, and `/upward-stats clean` prunes the archived tables earlier sessions left in the project.
 
 ## Does it work?
 
@@ -133,4 +134,4 @@ Cost behaves independently and is measured separately: zero cache misses across 
 Each plugin documents itself:
 
 - [`plugin/upward/README.md`](plugin/upward/README.md) — the complete rule set, exactly how the hook loads `core.md`, and notes for adapting the plugin to another project or harness.
-- [`plugin/upward-stats/README.md`](plugin/upward-stats/README.md) — what the hook records, the columns in `.upward/UPWARD-STATS.md`, and the full `/upward-stats` command set.
+- [`plugin/upward-stats/README.md`](plugin/upward-stats/README.md) — what the hook records, the columns in `.upward/UPWARD-STATS.md`, how the cost column is priced (and how to correct a price), and the full `/upward-stats` command set.
