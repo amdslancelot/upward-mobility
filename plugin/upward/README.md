@@ -58,6 +58,8 @@ The `SessionStart` hook (matches `startup`, `resume`, `clear`, `compact`) runs `
 
 None of the six skills above are injected automatically. The core rules tell the model which skill to invoke via the Skill tool for a given situation (e.g. "starting a multi-step task" → `upward-ops-plan`), so the detailed playbook only enters context when it's actually needed. Four of them (`upward-ops-plan`, `upward-ops-dispatch`, `upward-ops-review`, `upward-ops-judge`) form one operating loop — plan hands off to dispatch for execution, review checks the result, judge handles getting stuck — while `upward-debug` and `upward-harness-diagnose` are standalone tools usable with or without that loop, which is why their names drop the `-ops-` prefix.
 
+Because that injection never passes through the conversation, nothing in the session transcript records it — a cost tracker reading the transcript would miss it entirely. So the manifest declares it: `"standingInjection": "core.md"`. A co-installed tracker (`upward-stats`) reads that field to account for the standing cost, and skips it when this plugin is installed but disabled, since a disabled plugin's hook never runs.
+
 Token-usage tracking (`/upward-stats`) is no longer part of this plugin — install the separate `upward-stats` plugin for it.
 
 ## Notes for adapting this to another project
