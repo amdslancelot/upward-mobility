@@ -43,19 +43,21 @@ Everything lives inside the `.upward/` dot-directory so repo scans and glob patt
 
 ## Standing injections
 
-A plugin can put text into context without any of it passing through the conversation — `upward` does exactly that, `cat`-ing its `core.md` from a `SessionStart` hook. Nothing about it appears in the transcript: no tool call, no message. The only trace it leaves is that every later API call carries it. So it can't be measured from the transcript, and a table that ignores it understates the standing cost of the session.
+A `SessionStart` hook can put text into context without any of it passing through the conversation — `upward` does exactly that, `cat`-ing its `core.md` when a session starts. No tool call, no message; the only trace is that every later API call carries it. A table that ignores it understates the standing cost of the session.
 
-Any co-installed plugin can declare one in its own manifest:
+The transcript does record it, as the hook's own output, so that is what gets measured — **the text that actually entered context**, not a file read as a stand-in for it. Both injection channels count: a hook's raw stdout and a returned `additionalContext`. Each becomes a `(session start)` row labelled with the hook's matcher and the first line of what it injected:
 
-```json
-{ "name": "upward", "version": "0.6.1", "standingInjection": "core.md" }
+```
+| (session start) | [injected] startup: Upward-Mobility Operating Discipline (a… (~1,408 tok) | 0 | 0 | 0 | 0 | 0 | - | - |
 ```
 
-Declared injections are listed at the top of the table as `(session start)` rows, with an estimated size and zero in the token columns — the tokens themselves are already inside the following call's cache write, so a number there would double count.
+Token columns stay zero for the same reason skill rows do — the text is already inside the following call's cache write, so a number there would double count.
 
-A row appears only when the injection is **real**: the plugin must declare it, the file must exist, and the plugin must be enabled for this session (checked against `enabledPlugins` in project then user `settings.json`). A disabled plugin stays on disk with every file readable, so file existence alone would report a cost that never occurred.
+Treat the size as a **lower bound**. It is characters ÷ 4, and the harness wraps injected text before it reaches the model. Two identical one-prompt sessions differing only in whether `upward` was enabled came out 1,891 cache-read tokens apart, against an estimate of ~1,408 for the same injection — the estimate was about a third low. It is a scale marker, not an invoice; the `cost` column, which comes from the API's own usage numbers, is the invoice.
 
-The same lookup finds a loaded skill's `SKILL.md` for its size label. Sibling plugins are located by globbing both layouts a plugin can live in — `<marketplace>/<plugin>/` in a marketplace directory, `<marketplace>/<plugin>/<version>/` in the install cache — requiring a `.claude-plugin/plugin.json` to count as a plugin at all, and skipping cache versions marked `.orphaned_at` so the installed version is the one that answers.
+Measuring the record rather than the file means the count can't drift from reality: a plugin that is installed but **disabled** never runs its hook, so nothing is recorded and nothing is claimed; a `resume` or `compact` that re-injects mid-session produces another row, in place, rather than being silently folded into the first one; and a `SessionStart` hook you wrote yourself in `settings.json` is counted the same as a plugin's, with nothing to declare.
+
+Skill loads are a separate case: the transcript records that a skill was invoked but usually not its text, so a skill's size label still comes from reading its `SKILL.md`. Sibling plugins are located by globbing both layouts a plugin can live in — `<marketplace>/<plugin>/` in a marketplace directory, `<marketplace>/<plugin>/<version>/` in the install cache — requiring a `.claude-plugin/plugin.json` to count as a plugin at all, and skipping cache versions marked `.orphaned_at` so the installed version is the one that answers.
 
 ## The cost column
 

@@ -132,6 +132,7 @@ def empty_cache(transcript_path, level):
         "order": [],
         "seen_msg_ids": [],
         "emitted_pids": [],
+        "injections": [],
         "subagents": {},
         "agent_results": {},
     }
@@ -344,15 +345,6 @@ def collect_skills(content, into):
                 into.append(str(name))
 
 
-def read_json(path):
-    try:
-        with open(path) as f:
-            data = json.load(f)
-    except Exception:
-        return None
-    return data if isinstance(data, dict) else None
-
-
 def plugin_roots():
     """Returns (own_root, sibling_roots) — plugin directories that may hold a
     skills/ tree or a declared standing injection. Two layouts have to work and
@@ -422,59 +414,34 @@ def skill_injected_estimate(name):
     return f"~{n:,} tok injected"
 
 
-def plugin_key(root):
-    """`<plugin>@<marketplace>` — the key settings.json uses for enablement.
-    The marketplace directory sits one level above the plugin root in a
-    marketplace layout and two above it in the versioned install cache, told
-    apart by whether the parent directory is named after the plugin itself."""
-    manifest = read_json(os.path.join(root, ".claude-plugin", "plugin.json")) or {}
-    name = manifest.get("name") or os.path.basename(root)
-    parent = os.path.dirname(root)
-    market_dir = os.path.dirname(parent) if os.path.basename(parent) == name else parent
-    market = read_json(os.path.join(market_dir, ".claude-plugin", "marketplace.json")) or {}
-    return "{}@{}".format(name, market.get("name") or os.path.basename(market_dir))
+def injection_label(hook_name, content):
+    """Name a standing injection by what it actually put into context: the
+    hook's matcher (startup / resume / clear / compact) plus the first
+    meaningful line of the injected text, which is the only thing in the
+    record that identifies whose injection it is."""
+    matcher = (hook_name or "SessionStart").split(":")[-1]
+    first = next((ln.strip().lstrip("#").strip()
+                  for ln in content.splitlines() if ln.strip()), "")
+    return "{}: {}".format(matcher, first[:45]) if first else matcher
 
 
-def plugin_enabled(key, cwd):
-    """Whether `<plugin>@<marketplace>` is switched on for this session.
-    A disabled plugin stays on disk — its files are still readable and its
-    version directory is still the installed one — so file existence says
-    nothing about whether it ran. Only settings.json does. Project settings
-    win over user settings; a plugin no file mentions is enabled by default."""
-    for path in (os.path.join(cwd, ".claude", "settings.local.json"),
-                 os.path.join(cwd, ".claude", "settings.json"),
-                 os.path.join(os.path.expanduser("~"), ".claude", "settings.json")):
-        enabled = (read_json(path) or {}).get("enabledPlugins")
-        if isinstance(enabled, dict) and key in enabled:
-            return bool(enabled[key])
-    return True
+def collect_new_injections(cache):
+    """Injection rows not yet written. Unlike a task row, an injection row is
+    final the moment it is parsed — the text is already in context — so it can
+    be flushed on any event without risk of freezing a partial count."""
+    fresh = [inj for inj in cache.get("injections", []) if not inj.get("emitted")]
+    for inj in fresh:
+        inj["emitted"] = True
+    return fresh
 
 
-def standing_injections(cwd):
-    """(label, token estimate) for every co-installed plugin that declares a
-    `standingInjection` in its manifest and is enabled for this session.
-
-    A standing injection is text a plugin puts into context outside the
-    conversation — a SessionStart hook writing to stdout, say. It appears in
-    no transcript line and in no tool call; the only trace it leaves is that
-    every later API call carries it. It can't be measured from the transcript,
-    so the plugin holding it declares it and this reads the file. Declaration
-    beats hardcoding a sibling's filename: the knowledge lives with the plugin
-    that owns it, and this hook stays ignorant of any particular sibling."""
-    found = []
-    own, siblings = plugin_roots()
-    for root in [own] + siblings:
-        manifest = read_json(os.path.join(root, ".claude-plugin", "plugin.json")) or {}
-        rel = manifest.get("standingInjection")
-        if not isinstance(rel, str) or not rel:
-            continue
-        if not plugin_enabled(plugin_key(root), cwd):
-            continue
-        n = read_estimate(os.path.join(root, rel))
-        if n is None:
-            continue
-        found.append(("{}/{}".format(manifest.get("name") or os.path.basename(root), rel), n))
-    return found
+def render_injection_row(inj):
+    # Token columns stay zero for the same reason skill rows do: the injected
+    # text is already inside the following call's cache write, so a number
+    # here would double count. The size travels in the label.
+    zero = ["0"] * 5 + ["-", "-"]
+    return ("| (session start) | [injected] {} (~{:,} tok) | ".format(
+        esc(inj["label"]), inj["tokens"]) + " | ".join(zero) + " |")
 
 
 def parse_transcript_incremental(path, cache):
@@ -516,7 +483,32 @@ def parse_transcript_incremental(path, cache):
             if d.get("isSidechain"):
                 continue
             t = d.get("type")
-            if t == "user":
+            if t == "attachment":
+                # A SessionStart hook's stdout is injected into context before
+                # any turn: no tool call, no message, it just makes every later
+                # call's input longer. The harness does record it here, as the
+                # hook's own output — so the actual injected text is measured,
+                # rather than a plugin's file being read as a stand-in for it.
+                # A disabled plugin's hook never runs and so never appears.
+                a = d.get("attachment") or {}
+                content = a.get("content") or ""
+                # A hook can inject either way: raw stdout (hook_success) or a
+                # returned additionalContext (hook_additional_context, whose
+                # content is a list of strings). Both end up in context, so
+                # both count. Non-SessionStart hooks inject per turn, not once
+                # per session, and are not standing injections.
+                if isinstance(content, list):
+                    content = "\n".join(str(part) for part in content)
+                if (a.get("type") in ("hook_success", "hook_additional_context")
+                        and a.get("hookEvent") == "SessionStart"
+                        and isinstance(content, str) and content.strip()):
+                    cache.setdefault("injections", []).append({
+                        "label": injection_label(a.get("hookName"), content),
+                        "tokens": len(content) // 4,
+                        "ts": d.get("timestamp"),
+                        "emitted": False,
+                    })
+            elif t == "user":
                 content = d.get("message", {}).get("content")
                 # Scan for Agent tool_results before the promptId gate below —
                 # tool-result user lines don't reliably carry a promptId.
@@ -828,6 +820,7 @@ def main():
     # emitted once per prompt, so an early flush would freeze a partial count.
     on_subagent_stop = hook_input.get("hook_event_name") == "SubagentStop"
     new_tasks = [] if on_subagent_stop else collect_new_main_tasks(cache)
+    new_injections = collect_new_injections(cache)
     session_dir = os.path.splitext(transcript_path)[0]
     new_tasks += process_subagents(session_dir, cache)
     new_tasks.sort(key=lambda task: task.get("ts") or "")
@@ -853,19 +846,21 @@ def main():
         except Exception:
             pass
 
-    if new_tasks:
-        rows = render_rows(new_tasks, level, load_pricing(cwd))
+    if new_tasks or new_injections:
+        # Merge the two already-ordered streams so an injection lands where it
+        # happened: before the first task at session start, and in place when a
+        # resume or compact re-injects mid-session rather than at the top.
+        pricing = load_pricing(cwd)
+        rows, pending = [], list(new_tasks)
+        for inj in new_injections:
+            while pending and (pending[0].get("ts") or "") < (inj.get("ts") or ""):
+                rows += render_rows([pending.pop(0)], level, pricing)
+            rows.append(render_injection_row(inj))
+        for task in pending:
+            rows += render_rows([task], level, pricing)
+
         if not os.path.exists(out_path):
-            # The first write of a session also accounts for every standing
-            # injection: text a co-installed plugin puts into context before
-            # any task runs. Only declared-and-enabled ones are listed — a
-            # plugin that is installed but switched off injects nothing, and
-            # claiming otherwise would invent a cost that never occurred.
-            zero = ["0"] * 5 + ["-", "-"]
-            prefix = ["| (session start) | [injected] {} (~{:,} tok) | ".format(label, n)
-                      + " | ".join(zero) + " |"
-                      for label, n in standing_injections(cwd)]
-            write_new_file(out_path, session_id, level, prefix + rows)
+            write_new_file(out_path, session_id, level, rows)
         else:
             append_rows(out_path, rows)
 
