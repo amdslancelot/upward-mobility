@@ -167,14 +167,94 @@ def save_cache(cwd, cache):
 
 def call_usage(msg):
     usage = msg.get("usage") or {}
+    total_write = usage.get("cache_creation_input_tokens", 0)
+    # Cache writes are priced by TTL (5-minute vs 1-hour), so keep the split the
+    # API reports alongside the total the table displays. Older transcripts have
+    # no `cache_creation` breakdown; charge the whole amount at the 5m rate then.
+    creation = usage.get("cache_creation") or {}
+    write_5m = creation.get("ephemeral_5m_input_tokens")
+    write_1h = creation.get("ephemeral_1h_input_tokens")
+    if write_5m is None and write_1h is None:
+        write_5m, write_1h = total_write, 0
     return {
         "model": msg.get("model", "unknown"),
         "output": usage.get("output_tokens", 0),
-        "cache_write": usage.get("cache_creation_input_tokens", 0),
+        "cache_write": total_write,
+        "cache_write_5m": write_5m or 0,
+        "cache_write_1h": write_1h or 0,
         "cache_read": usage.get("cache_read_input_tokens", 0),
         "fresh_input": usage.get("input_tokens", 0),
         "desc": None,
     }
+
+
+def load_pricing(cwd):
+    """List prices in USD per million tokens, keyed by model id. The shipped
+    hooks/pricing.json is the base; a project's own .upward/pricing.json (same
+    shape) overrides it per model id, so a user can correct a price without
+    editing a file the next plugin update would overwrite. An unreadable or
+    malformed file contributes nothing rather than breaking the hook."""
+    models = {}
+    for path in (os.path.join(os.path.dirname(os.path.abspath(__file__)), "pricing.json"),
+                 os.path.join(upward_dir(cwd), "pricing.json")):
+        try:
+            with open(path) as f:
+                data = json.load(f)
+            entries = data.get("models") if isinstance(data, dict) else None
+            if isinstance(entries, dict):
+                models.update(entries)
+        except Exception:
+            continue
+    return models
+
+
+def price_for(model, pricing):
+    """Rates for one model id, or None when it isn't priced. Exact id first,
+    then the longest key that is a substring of it — so a dated id
+    (claude-haiku-4-5-20251001) resolves through its undated key. Cache rates
+    default to the standard multiples of the input rate unless spelled out."""
+    entry = pricing.get(model)
+    if entry is None:
+        for key in sorted(pricing, key=len, reverse=True):
+            if key in model:
+                entry = pricing[key]
+                break
+    if not isinstance(entry, dict):
+        return None
+    inp, out = entry.get("input"), entry.get("output")
+    if inp is None or out is None:
+        return None
+    return {
+        "input": inp,
+        "output": out,
+        "cache_read": entry.get("cache_read", inp * 0.1),
+        "cache_write_5m": entry.get("cache_write_5m", inp * 1.25),
+        "cache_write_1h": entry.get("cache_write_1h", inp * 2.0),
+    }
+
+
+def call_cost(call, pricing):
+    """List-price USD for one API call, or None when the model has no entry —
+    None propagates to a `?` in the table rather than a wrong number."""
+    model = call.get("model") or "unknown"
+    if model == "<synthetic>":
+        # Harness-generated placeholder message; no API call was billed.
+        return 0.0
+    rates = price_for(model, pricing)
+    if rates is None:
+        return None
+    write_5m = call.get("cache_write_5m")
+    write_1h = call.get("cache_write_1h")
+    if write_5m is None and write_1h is None:
+        # Row parsed by a pre-cost version of this hook, still in the cache.
+        write_5m, write_1h = call.get("cache_write", 0), 0
+    return (
+        call.get("fresh_input", 0) * rates["input"]
+        + call.get("output", 0) * rates["output"]
+        + call.get("cache_read", 0) * rates["cache_read"]
+        + (write_5m or 0) * rates["cache_write_5m"]
+        + (write_1h or 0) * rates["cache_write_1h"]
+    ) / 1_000_000
 
 
 def describe_block(block):
@@ -493,13 +573,19 @@ def process_subagents(session_dir, cache):
     return new_tasks
 
 
-def summarize(calls):
+def summarize(calls, pricing):
+    # Cost is summed per call, never derived from the totals: a task row can mix
+    # models, and the priced calls must still add up even when one of them is a
+    # model with no price entry (counted in `unpriced` and flagged in the cell).
+    costs = [call_cost(c, pricing) for c in calls]
     return {
         "calls": len(calls),
         "output": sum(c["output"] for c in calls),
         "cache_write": sum(c["cache_write"] for c in calls),
         "cache_read": sum(c["cache_read"] for c in calls),
         "fresh_input": sum(c["fresh_input"] for c in calls),
+        "cost": sum(c for c in costs if c is not None),
+        "unpriced": sum(1 for c in costs if c is None),
     }
 
 
@@ -516,31 +602,46 @@ def fmt(n):
     return f"{n:,}"
 
 
+def fmt_cost(s):
+    """`-` for a row with no API call behind it (a skill-load marker), `?` when
+    nothing in the row could be priced, and `$x.xxxx+?` when only part of it
+    could — a partial sum must not read as the full cost."""
+    if not s["calls"]:
+        return "-"
+    if s["unpriced"] >= s["calls"]:
+        return "?"
+    text = f"${s['cost']:.4f}"
+    return text + "+?" if s["unpriced"] else text
+
+
 def header_cells(level):
-    header = ["task", "subtask", "calls", "output", "cache write", "cache read", "fresh input"]
+    header = ["task", "subtask", "calls", "output", "cache write", "cache read",
+              "fresh input", "cost"]
     if level == "call":
         header.append("model")
     return header
 
 
-def render_rows(tasks, level):
+def render_rows(tasks, level, pricing):
     lines = []
 
     def row(task_label, subtask, s, model=None):
         cells = [task_label, subtask, fmt(s["calls"]), fmt(s["output"]),
-                 fmt(s["cache_write"]), fmt(s["cache_read"]), fmt(s["fresh_input"])]
+                 fmt(s["cache_write"]), fmt(s["cache_read"]), fmt(s["fresh_input"]),
+                 fmt_cost(s)]
         if level == "call":
             cells.append(model or "")
         lines.append("| " + " | ".join(esc(c) for c in cells) + " |")
 
-    zero = {"calls": 0, "output": 0, "cache_write": 0, "cache_read": 0, "fresh_input": 0}
+    zero = {"calls": 0, "output": 0, "cache_write": 0, "cache_read": 0,
+            "fresh_input": 0, "cost": 0.0, "unpriced": 0}
     for task in tasks:
-        total = summarize(task["calls"])
+        total = summarize(task["calls"], pricing)
         row(task["label"], "-", total, models_label(task["calls"]) if level == "call" else None)
         if level == "call":
             for i, c in enumerate(task["calls"], 1):
                 subtask = c.get("desc") or f"call {i}"
-                row(task["label"], f"{i}. {subtask}", summarize([c]), c["model"])
+                row(task["label"], f"{i}. {subtask}", summarize([c], pricing), c["model"])
         # One informational row per Skill load, at both levels. Token columns
         # stay zero on purpose: the injected content is already inside the
         # following call's cache write, so putting an amount here would double
@@ -558,6 +659,10 @@ def write_new_file(path, session_id, level, rows):
         "",
         f"Session: `{session_id}` · Level: `{level}` · "
         f"Started: {datetime.now(timezone.utc).isoformat(timespec='seconds')}",
+        "",
+        "`cost` is estimated from list prices in the plugin's `hooks/pricing.json` "
+        "(override per model in `.upward/pricing.json`); `?` marks a model with no "
+        "price entry. Long-context (>200k) premium tiers are not applied.",
         "",
         "| " + " | ".join(header) + " |",
         "|" + "---|" * len(header),
@@ -648,7 +753,7 @@ def main():
             pass
 
     if new_tasks:
-        rows = render_rows(new_tasks, level)
+        rows = render_rows(new_tasks, level, load_pricing(cwd))
         if not os.path.exists(out_path):
             # First write of a session also records the always-on injection:
             # when the sibling `upward` plugin is installed, its core.md enters
@@ -658,7 +763,7 @@ def main():
             core_est = skill_injected_estimate("core.md")
             prefix = []
             if core_est != "size unknown":
-                zero = ["0"] * 5 + (["-"] if level == "call" else [])
+                zero = ["0"] * 5 + ["-"] + (["-"] if level == "call" else [])
                 prefix = ["| (session start) | [skill] core.md "
                           f"({core_est}) | " + " | ".join(zero) + " |"]
             write_new_file(out_path, session_id, level, prefix + rows)

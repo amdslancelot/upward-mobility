@@ -1,10 +1,12 @@
 ---
 name: upward-stats
-description: Turn per-prompt/per-call token usage tracking on or off, written to .upward/UPWARD-STATS.md. Use when the user runs "/upward-stats on", "/upward-stats off", "/upward-stats level task", or "/upward-stats level call".
+description: Turn per-prompt/per-call token usage and cost tracking on or off, written to .upward/UPWARD-STATS.md. Use when the user runs "/upward-stats on", "/upward-stats off", "/upward-stats level task", or "/upward-stats level call".
 ---
 # upward-stats: toggle token-usage tracking
 
-This skill only flips a switch. The actual recording (reading the session transcript, summing token usage per call, grouping into tasks, writing the table) happens automatically in a `Stop` hook shipped with this plugin (`hooks/upward_stats.py`) — it runs after every turn and checks the switch. Don't try to compute or write the stats table by hand; that duplicates what the hook already does correctly.
+This skill only flips a switch. The actual recording (reading the session transcript, summing token usage per call, costing it against `hooks/pricing.json`, grouping into tasks, writing the table) happens automatically in a `Stop` hook shipped with this plugin (`hooks/upward_stats.py`) — it runs after every turn and checks the switch. Don't try to compute or write the stats table by hand; that duplicates what the hook already does correctly.
+
+If the user wants a price corrected or a missing model priced, write `.upward/pricing.json` — `{"models": {"<model-id>": {"input": <USD per MTok>, "output": <USD per MTok>}}}` — which overrides the shipped table per model id. Don't edit the plugin's own `pricing.json`; a plugin update overwrites it.
 
 ## State file
 
@@ -23,7 +25,7 @@ Tracking is **on by default**: if this file is missing or unparsable, the hook t
    - `on` → `enabled: true`
    - `off` → `enabled: false`
    - `level task` → `level: "task"` (one row per prompt)
-   - `level call` → `level: "call"` (one row per prompt, plus one row per individual API call underneath, with a model column)
+   - `level call` → `level: "call"` (one row per prompt, plus one row per individual API call underneath)
    - anything else / no argument → don't change the file, just report the current state
 3. Write the full JSON object back to `.upward/stats-state.json`, creating the `.upward/` directory first if it doesn't exist (preserve the field you didn't just change).
 4. Report the resulting state in one line, e.g. "upward-stats: on, level=task — writes to .upward/UPWARD-STATS.md after each turn."
