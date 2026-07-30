@@ -344,33 +344,68 @@ def collect_skills(content, into):
                 into.append(str(name))
 
 
+def plugin_roots():
+    """Returns (own_root, sibling_roots) — directories that may hold a core.md
+    or a skills/ tree. Two layouts have to work and they nest differently: in a
+    marketplace directory (this repo) a sibling plugin is `<market>/<plugin>/`,
+    while an installed plugin is copied to `<market>/<plugin>/<version>/`, one
+    level deeper. Globbing both from this file's location covers either without
+    the hook needing to know which one it is running from. Superseded versions
+    left behind in the install cache carry an `.orphaned_at` marker and are
+    skipped, so a stale copy can't answer for the installed one."""
+    here = os.path.dirname(os.path.abspath(__file__))
+    own = os.path.normpath(os.path.join(here, ".."))
+    siblings, seen = [], {own}
+    for pattern in (os.path.join(here, "..", "..", "*"),
+                    os.path.join(here, "..", "..", "..", "*", "*")):
+        for path in sorted(glob.glob(pattern)):
+            path = os.path.normpath(path)
+            if path in seen or not os.path.isdir(path):
+                continue
+            seen.add(path)
+            if os.path.exists(os.path.join(path, ".orphaned_at")):
+                continue
+            siblings.append(path)
+    return own, siblings
+
+
+def read_estimate(path):
+    """~len/4 token estimate for a file, or None if it can't be read."""
+    try:
+        with open(path) as f:
+            return len(f.read()) // 4
+    except Exception:
+        return None
+
+
 def skill_injected_estimate(name):
     """Approximate token cost of a skill's SKILL.md landing in context.
     Returns a short label fragment; the ~len/4 heuristic is an estimate and is
-    marked as such. Files are searched across a few candidate plugin roots: this
-    stats plugin ships only the upward-stats skill, while core.md and the
-    upward-ops-* skills live in the sibling `upward` plugin (present only when
-    that plugin is co-installed). Anything not found returns 'size unknown'."""
-    here = os.path.dirname(os.path.abspath(__file__))
-    # Candidate plugin roots, most specific first: this plugin, then a sibling
-    # `upward` plugin checked out alongside it in the marketplace layout.
-    roots = [
-        os.path.join(here, ".."),
-        os.path.join(here, "..", "..", "upward"),
-    ]
-    for root in roots:
-        if name == "core.md":
-            path = os.path.join(root, "core.md")
-        else:
-            short = name.split(":")[-1]
-            path = os.path.join(root, "skills", short, "SKILL.md")
-        try:
-            with open(path) as f:
-                n = len(f.read()) // 4
-            return f"~{n:,} tok injected"
-        except Exception:
-            continue
-    return "size unknown"
+    marked as such. This stats plugin ships only the upward-stats skill, while
+    core.md and the upward-ops-* skills live in the sibling `upward` plugin
+    (present only when that plugin is co-installed) — so its own root is tried
+    first and siblings only after, with the most recently modified winning if
+    more than one answers. Anything not found returns 'size unknown'."""
+    rel = ["core.md"] if name == "core.md" else ["skills", name.split(":")[-1], "SKILL.md"]
+    own, siblings = plugin_roots()
+    n = read_estimate(os.path.join(own, *rel))
+    if n is None:
+        best = None
+        for root in siblings:
+            path = os.path.join(root, *rel)
+            n2 = read_estimate(path)
+            if n2 is None:
+                continue
+            try:
+                mtime = os.path.getmtime(path)
+            except OSError:
+                continue
+            if best is None or mtime > best[0]:
+                best = (mtime, n2)
+        if best is None:
+            return "size unknown"
+        n = best[1]
+    return f"~{n:,} tok injected"
 
 
 def parse_transcript_incremental(path, cache):

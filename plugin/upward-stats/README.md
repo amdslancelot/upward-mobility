@@ -41,7 +41,7 @@ State lives in `.upward/stats-state.json` under the project root: `{"enabled": t
 
 Everything lives inside the `.upward/` dot-directory so repo scans and glob patterns skip it by default. The directory is generated/local — add `.upward/` to your project's `.gitignore` if you don't want it tracked. (Plugin versions before the split wrote the files at the project root; the hook migrates them into `.upward/` automatically.)
 
-When the sibling `upward` plugin is co-installed, the first row of each session's table also accounts for `upward`'s always-on `core.md` injection; without `upward` that row is omitted.
+When the sibling `upward` plugin is co-installed, the first row of each session's table also accounts for `upward`'s always-on `core.md` injection; without `upward` that row is omitted. Sibling files are located by globbing both layouts a plugin can live in — `<marketplace>/<plugin>/` when run from a marketplace directory, `<marketplace>/<plugin>/<version>/` when run from the install cache — and superseded versions in the cache (marked `.orphaned_at`) are skipped, so the installed version is the one that answers.
 
 ## The cost column
 
