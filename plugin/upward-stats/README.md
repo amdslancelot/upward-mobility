@@ -12,7 +12,7 @@ Output at `level: call` — one prompt, the three API calls it took, and the ski
 
 | task | subtask | calls | output | cache write | cache read | fresh input | cost | model |
 |---|---|---|---|---|---|---|---|---|
-| (session start) | [skill] core.md (~1,408 tok injected) | 0 | 0 | 0 | 0 | 0 | - | - |
+| (session start) | [injected] upward/core.md (~1,408 tok) | 0 | 0 | 0 | 0 | 0 | - | - |
 | price each row of the stats table | - | 3 | 1,763 | 5,494 | 153,853 | 7 | $0.1760 | claude-opus-5 |
 | price each row of the stats table | 1. Read: upward_stats.py | 1 | 171 | 572 | 27,058 | 2 | $0.0235 | claude-opus-5 |
 | price each row of the stats table | 2. Edit: upward_stats.py | 1 | 1,204 | 3,180 | 61,880 | 3 | $0.0929 | claude-opus-5 |
@@ -41,7 +41,21 @@ State lives in `.upward/stats-state.json` under the project root: `{"enabled": t
 
 Everything lives inside the `.upward/` dot-directory so repo scans and glob patterns skip it by default. The directory is generated/local — add `.upward/` to your project's `.gitignore` if you don't want it tracked. (Plugin versions before the split wrote the files at the project root; the hook migrates them into `.upward/` automatically.)
 
-When the sibling `upward` plugin is co-installed, the first row of each session's table also accounts for `upward`'s always-on `core.md` injection; without `upward` that row is omitted. Sibling files are located by globbing both layouts a plugin can live in — `<marketplace>/<plugin>/` when run from a marketplace directory, `<marketplace>/<plugin>/<version>/` when run from the install cache — and superseded versions in the cache (marked `.orphaned_at`) are skipped, so the installed version is the one that answers.
+## Standing injections
+
+A plugin can put text into context without any of it passing through the conversation — `upward` does exactly that, `cat`-ing its `core.md` from a `SessionStart` hook. Nothing about it appears in the transcript: no tool call, no message. The only trace it leaves is that every later API call carries it. So it can't be measured from the transcript, and a table that ignores it understates the standing cost of the session.
+
+Any co-installed plugin can declare one in its own manifest:
+
+```json
+{ "name": "upward", "version": "0.6.1", "standingInjection": "core.md" }
+```
+
+Declared injections are listed at the top of the table as `(session start)` rows, with an estimated size and zero in the token columns — the tokens themselves are already inside the following call's cache write, so a number there would double count.
+
+A row appears only when the injection is **real**: the plugin must declare it, the file must exist, and the plugin must be enabled for this session (checked against `enabledPlugins` in project then user `settings.json`). A disabled plugin stays on disk with every file readable, so file existence alone would report a cost that never occurred.
+
+The same lookup finds a loaded skill's `SKILL.md` for its size label. Sibling plugins are located by globbing both layouts a plugin can live in — `<marketplace>/<plugin>/` in a marketplace directory, `<marketplace>/<plugin>/<version>/` in the install cache — requiring a `.claude-plugin/plugin.json` to count as a plugin at all, and skipping cache versions marked `.orphaned_at` so the installed version is the one that answers.
 
 ## The cost column
 

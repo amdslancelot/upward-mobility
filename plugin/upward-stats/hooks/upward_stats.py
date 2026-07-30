@@ -344,15 +344,25 @@ def collect_skills(content, into):
                 into.append(str(name))
 
 
+def read_json(path):
+    try:
+        with open(path) as f:
+            data = json.load(f)
+    except Exception:
+        return None
+    return data if isinstance(data, dict) else None
+
+
 def plugin_roots():
-    """Returns (own_root, sibling_roots) — directories that may hold a core.md
-    or a skills/ tree. Two layouts have to work and they nest differently: in a
-    marketplace directory (this repo) a sibling plugin is `<market>/<plugin>/`,
-    while an installed plugin is copied to `<market>/<plugin>/<version>/`, one
-    level deeper. Globbing both from this file's location covers either without
-    the hook needing to know which one it is running from. Superseded versions
-    left behind in the install cache carry an `.orphaned_at` marker and are
-    skipped, so a stale copy can't answer for the installed one."""
+    """Returns (own_root, sibling_roots) — plugin directories that may hold a
+    skills/ tree or a declared standing injection. Two layouts have to work and
+    they nest differently: in a marketplace directory (this repo) a sibling
+    plugin is `<market>/<plugin>/`, while an installed plugin is copied to
+    `<market>/<plugin>/<version>/`, one level deeper. Globbing both from this
+    file's location covers either without the hook needing to know which one it
+    is running from. Superseded versions left behind in the install cache carry
+    an `.orphaned_at` marker and are skipped, so a stale copy can't answer for
+    the installed one."""
     here = os.path.dirname(os.path.abspath(__file__))
     own = os.path.normpath(os.path.join(here, ".."))
     siblings, seen = [], {own}
@@ -364,6 +374,11 @@ def plugin_roots():
                 continue
             seen.add(path)
             if os.path.exists(os.path.join(path, ".orphaned_at")):
+                continue
+            if not os.path.isfile(os.path.join(path, ".claude-plugin", "plugin.json")):
+                # Both globs also reach plain directories that happen to sit
+                # beside a plugin. A manifest is what makes a directory a
+                # plugin, and only a plugin may answer for a skill's size.
                 continue
             siblings.append(path)
     return own, siblings
@@ -381,12 +396,11 @@ def read_estimate(path):
 def skill_injected_estimate(name):
     """Approximate token cost of a skill's SKILL.md landing in context.
     Returns a short label fragment; the ~len/4 heuristic is an estimate and is
-    marked as such. This stats plugin ships only the upward-stats skill, while
-    core.md and the upward-ops-* skills live in the sibling `upward` plugin
-    (present only when that plugin is co-installed) — so its own root is tried
-    first and siblings only after, with the most recently modified winning if
-    more than one answers. Anything not found returns 'size unknown'."""
-    rel = ["core.md"] if name == "core.md" else ["skills", name.split(":")[-1], "SKILL.md"]
+    marked as such. A loaded skill can belong to any co-installed plugin, so
+    this plugin's own root is tried first and siblings only after, with the
+    most recently modified winning if more than one answers. Anything not
+    found returns 'size unknown'."""
+    rel = ["skills", name.split(":")[-1], "SKILL.md"]
     own, siblings = plugin_roots()
     n = read_estimate(os.path.join(own, *rel))
     if n is None:
@@ -406,6 +420,61 @@ def skill_injected_estimate(name):
             return "size unknown"
         n = best[1]
     return f"~{n:,} tok injected"
+
+
+def plugin_key(root):
+    """`<plugin>@<marketplace>` — the key settings.json uses for enablement.
+    The marketplace directory sits one level above the plugin root in a
+    marketplace layout and two above it in the versioned install cache, told
+    apart by whether the parent directory is named after the plugin itself."""
+    manifest = read_json(os.path.join(root, ".claude-plugin", "plugin.json")) or {}
+    name = manifest.get("name") or os.path.basename(root)
+    parent = os.path.dirname(root)
+    market_dir = os.path.dirname(parent) if os.path.basename(parent) == name else parent
+    market = read_json(os.path.join(market_dir, ".claude-plugin", "marketplace.json")) or {}
+    return "{}@{}".format(name, market.get("name") or os.path.basename(market_dir))
+
+
+def plugin_enabled(key, cwd):
+    """Whether `<plugin>@<marketplace>` is switched on for this session.
+    A disabled plugin stays on disk — its files are still readable and its
+    version directory is still the installed one — so file existence says
+    nothing about whether it ran. Only settings.json does. Project settings
+    win over user settings; a plugin no file mentions is enabled by default."""
+    for path in (os.path.join(cwd, ".claude", "settings.local.json"),
+                 os.path.join(cwd, ".claude", "settings.json"),
+                 os.path.join(os.path.expanduser("~"), ".claude", "settings.json")):
+        enabled = (read_json(path) or {}).get("enabledPlugins")
+        if isinstance(enabled, dict) and key in enabled:
+            return bool(enabled[key])
+    return True
+
+
+def standing_injections(cwd):
+    """(label, token estimate) for every co-installed plugin that declares a
+    `standingInjection` in its manifest and is enabled for this session.
+
+    A standing injection is text a plugin puts into context outside the
+    conversation — a SessionStart hook writing to stdout, say. It appears in
+    no transcript line and in no tool call; the only trace it leaves is that
+    every later API call carries it. It can't be measured from the transcript,
+    so the plugin holding it declares it and this reads the file. Declaration
+    beats hardcoding a sibling's filename: the knowledge lives with the plugin
+    that owns it, and this hook stays ignorant of any particular sibling."""
+    found = []
+    own, siblings = plugin_roots()
+    for root in [own] + siblings:
+        manifest = read_json(os.path.join(root, ".claude-plugin", "plugin.json")) or {}
+        rel = manifest.get("standingInjection")
+        if not isinstance(rel, str) or not rel:
+            continue
+        if not plugin_enabled(plugin_key(root), cwd):
+            continue
+        n = read_estimate(os.path.join(root, rel))
+        if n is None:
+            continue
+        found.append(("{}/{}".format(manifest.get("name") or os.path.basename(root), rel), n))
+    return found
 
 
 def parse_transcript_incremental(path, cache):
@@ -787,17 +856,15 @@ def main():
     if new_tasks:
         rows = render_rows(new_tasks, level, load_pricing(cwd))
         if not os.path.exists(out_path):
-            # First write of a session also records the always-on injection:
-            # when the sibling `upward` plugin is installed, its core.md enters
-            # context at every SessionStart, before any task. If core.md can't
-            # be found (upward not co-installed), skip the row — there is no
-            # such injection to account for.
-            core_est = skill_injected_estimate("core.md")
-            prefix = []
-            if core_est != "size unknown":
-                zero = ["0"] * 5 + ["-", "-"]
-                prefix = ["| (session start) | [skill] core.md "
-                          f"({core_est}) | " + " | ".join(zero) + " |"]
+            # The first write of a session also accounts for every standing
+            # injection: text a co-installed plugin puts into context before
+            # any task runs. Only declared-and-enabled ones are listed — a
+            # plugin that is installed but switched off injects nothing, and
+            # claiming otherwise would invent a cost that never occurred.
+            zero = ["0"] * 5 + ["-", "-"]
+            prefix = ["| (session start) | [injected] {} (~{:,} tok) | ".format(label, n)
+                      + " | ".join(zero) + " |"
+                      for label, n in standing_injections(cwd)]
             write_new_file(out_path, session_id, level, prefix + rows)
         else:
             append_rows(out_path, rows)
