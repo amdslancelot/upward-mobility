@@ -104,7 +104,7 @@ def migrate_root_files(cwd):
 
 def load_state(cwd):
     # Default on: no state file (or unparsable) means tracking is enabled.
-    default = {"enabled": True, "level": "task"}
+    default = {"enabled": True, "level": "call"}
     path = os.path.join(upward_dir(cwd), "stats-state.json")
     try:
         with open(path) as f:
@@ -709,7 +709,7 @@ def main():
     state = load_state(cwd)
     if not state or not state.get("enabled"):
         return
-    level = state.get("level") if state.get("level") in ("task", "call") else "task"
+    level = state.get("level") if state.get("level") in ("task", "call") else "call"
     try:
         os.makedirs(upward_dir(cwd), exist_ok=True)
     except Exception:
