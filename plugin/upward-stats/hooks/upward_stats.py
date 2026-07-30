@@ -614,30 +614,27 @@ def fmt_cost(s):
     return text + "+?" if s["unpriced"] else text
 
 
-def header_cells(level):
-    header = ["task", "subtask", "calls", "output", "cache write", "cache read",
-              "fresh input", "cost"]
-    if level == "call":
-        header.append("model")
-    return header
+def header_cells():
+    # `model` is present at both levels: which model ran a task is what makes
+    # its cost readable, and a task-level table without it can't be checked.
+    return ["task", "subtask", "calls", "output", "cache write", "cache read",
+            "fresh input", "cost", "model"]
 
 
 def render_rows(tasks, level, pricing):
     lines = []
 
-    def row(task_label, subtask, s, model=None):
+    def row(task_label, subtask, s, model):
         cells = [task_label, subtask, fmt(s["calls"]), fmt(s["output"]),
                  fmt(s["cache_write"]), fmt(s["cache_read"]), fmt(s["fresh_input"]),
-                 fmt_cost(s)]
-        if level == "call":
-            cells.append(model or "")
+                 fmt_cost(s), model]
         lines.append("| " + " | ".join(esc(c) for c in cells) + " |")
 
     zero = {"calls": 0, "output": 0, "cache_write": 0, "cache_read": 0,
             "fresh_input": 0, "cost": 0.0, "unpriced": 0}
     for task in tasks:
         total = summarize(task["calls"], pricing)
-        row(task["label"], "-", total, models_label(task["calls"]) if level == "call" else None)
+        row(task["label"], "-", total, models_label(task["calls"]))
         if level == "call":
             for i, c in enumerate(task["calls"], 1):
                 subtask = c.get("desc") or f"call {i}"
@@ -648,12 +645,12 @@ def render_rows(tasks, level, pricing):
         # count — the size estimate travels in the label instead.
         for name in task.get("skills", []):
             row(task["label"], f"[skill] {name} ({skill_injected_estimate(name)})",
-                zero, "-" if level == "call" else None)
+                zero, "-")
     return lines
 
 
 def write_new_file(path, session_id, level, rows):
-    header = header_cells(level)
+    header = header_cells()
     lines = [
         "# Upward Stats",
         "",
@@ -763,7 +760,7 @@ def main():
             core_est = skill_injected_estimate("core.md")
             prefix = []
             if core_est != "size unknown":
-                zero = ["0"] * 5 + ["-"] + (["-"] if level == "call" else [])
+                zero = ["0"] * 5 + ["-", "-"]
                 prefix = ["| (session start) | [skill] core.md "
                           f"({core_est}) | " + " | ".join(zero) + " |"]
             write_new_file(out_path, session_id, level, prefix + rows)
