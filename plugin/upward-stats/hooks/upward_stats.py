@@ -440,8 +440,9 @@ def render_injection_row(inj):
     # text is already inside the following call's cache write, so a number
     # here would double count. The size travels in the label.
     zero = ["0"] * 5 + ["-", "-"]
-    return ("| (session start) | [injected] {} (~{:,} tok) | ".format(
-        esc(inj["label"]), inj["tokens"]) + " | ".join(zero) + " |")
+    return ("| {} | [injected] {} (~{:,} tok) | ".format(
+        inj.get("when", "(session start)"), esc(inj["label"]), inj["tokens"])
+        + " | ".join(zero) + " |")
 
 
 def parse_transcript_incremental(path, cache):
@@ -503,11 +504,32 @@ def parse_transcript_incremental(path, cache):
                         and a.get("hookEvent") == "SessionStart"
                         and isinstance(content, str) and content.strip()):
                     cache.setdefault("injections", []).append({
+                        "when": "(session start)",
                         "label": injection_label(a.get("hookName"), content),
                         "tokens": len(content) // 4,
                         "ts": d.get("timestamp"),
                         "emitted": False,
                     })
+                # Compaction discards the conversation, so the full text of
+                # every skill still loaded is written back into context and
+                # recorded here — a second time paying for a skill already
+                # paid for once. Keyed on this record rather than on a
+                # compaction marker: the record is what proves the text
+                # actually went in, whatever triggered it.
+                if a.get("type") == "invoked_skills":
+                    for skill in a.get("skills") or []:
+                        if not isinstance(skill, dict):
+                            continue
+                        text = skill.get("content") or ""
+                        if not isinstance(text, str) or not text.strip():
+                            continue
+                        cache.setdefault("injections", []).append({
+                            "when": "(re-injected)",
+                            "label": str(skill.get("name") or "skill"),
+                            "tokens": len(text) // 4,
+                            "ts": d.get("timestamp"),
+                            "emitted": False,
+                        })
             elif t == "user":
                 content = d.get("message", {}).get("content")
                 # Scan for Agent tool_results before the promptId gate below —
